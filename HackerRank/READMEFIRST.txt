@@ -8,7 +8,7 @@ Medium Problems: DONE
 Hard Problems: INCOMPLETE
 
 C++:
-Easy Problems: INCOMPLETE
+Easy Problems: DONE
 Medium Problems: INCOMPLETE
 Hard Problems: INCOMPLETE
 
