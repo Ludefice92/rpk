@@ -9,7 +9,7 @@ Hard Problems: INCOMPLETE
 
 C++:
 Easy Problems: DONE
-Medium Problems: INCOMPLETE
+Medium Problems: DONE
 Hard Problems: INCOMPLETE
 
 Python:
