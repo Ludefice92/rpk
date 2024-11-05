@@ -18,7 +18,7 @@ Medium Problems: INCOMPLETE
 Hard Problems: INCOMPLETE
 
 Java:
-Easy Problems: INCOMPLETE
+Easy Problems: DONE
 Medium Problems: INCOMPLETE
 Hard Problems: INCOMPLETE
 
