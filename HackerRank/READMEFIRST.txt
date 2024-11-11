@@ -13,14 +13,14 @@ Medium Problems: DONE
 Hard Problems: INCOMPLETE
 
 Python:
-Easy Problems: INCOMPLETE
+Easy Problems: DONE
 Medium Problems: INCOMPLETE
 Hard Problems: INCOMPLETE
 
 Java:
 Easy Problems: DONE
 Medium Problems: INCOMPLETE
-Hard Problems: INCOMPLETE
+Hard Problems: There are none
 
 SQL:
 Easy Problems: INCOMPLETE
