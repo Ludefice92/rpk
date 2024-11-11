@@ -1,17 +1,20 @@
 #!/bin/env python3
 import argparse
 import pandas as pd
+import warnings
+# Suppress all warnings, for now this is just to ignore a spam message from pandas to make the console output more readable
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 def calculate_mortgage_payment(principal, annual_interest_rate, years):
     monthly_interest_rate = annual_interest_rate / 12 / 100
     number_of_payments = years * 12
     monthly_payment = (principal * monthly_interest_rate * (1 + monthly_interest_rate) ** number_of_payments) / ((1 + monthly_interest_rate) ** number_of_payments - 1)
-    return monthly_payment
+    return round(monthly_payment,2)
 
 def calculate_interest_payment(outstanding_balance, annual_interest_rate):
     monthly_interest_rate = annual_interest_rate / 12 / 100
     interest_payment = outstanding_balance * monthly_interest_rate
-    return interest_payment
+    return round(interest_payment,2)
 
 def calculate_amortization_schedule(house_value, down_payment_multiplier, annual_interest_rate, years, opportunity_cost_base, property_tax, rent_saved, help, monthly_expense_difference, maintenance_fees, is_condo):
     principal = house_value * down_payment_multiplier
@@ -59,14 +62,23 @@ def calculate_amortization_schedule(house_value, down_payment_multiplier, annual
             total_condo_fees_paid += condo_fees
             profit_if_sold -= total_condo_fees_paid
             profit_if_sold_with_help = profit_if_sold + total_help
-            schedule.append((month, monthly_payment, interest_payment, principal_payment, outstanding_balance, (opportunity_cost-opportunity_cost_base), total_property_tax_paid, rent_saved, current_house_value, total_extra_monthly_expenses_paid, total_maintenance_fees_paid, total_condo_fees_paid, profit_if_sold, total_help, profit_if_sold_with_help))
+            schedule.append((month, monthly_payment, interest_payment, principal_payment, round(outstanding_balance,2), round((opportunity_cost-opportunity_cost_base),2),
+                             round(total_property_tax_paid,2), round(rent_saved,2), round(current_house_value,2), total_extra_monthly_expenses_paid, total_maintenance_fees_paid,
+                             total_condo_fees_paid, round(profit_if_sold,2), total_help, round(profit_if_sold_with_help,2)))
         else:
             profit_if_sold_with_help = profit_if_sold + total_help
-            schedule.append((month, monthly_payment, interest_payment, principal_payment, outstanding_balance, (opportunity_cost-opportunity_cost_base), total_property_tax_paid, rent_saved, current_house_value, total_extra_monthly_expenses_paid, total_maintenance_fees_paid, profit_if_sold, total_help, profit_if_sold_with_help))
+            schedule.append((month, monthly_payment, interest_payment, principal_payment, round(outstanding_balance,2), round((opportunity_cost-opportunity_cost_base),2),
+                             round(total_property_tax_paid,2), round(rent_saved,2), round(current_house_value,2), total_extra_monthly_expenses_paid, total_maintenance_fees_paid,
+                             round(profit_if_sold,2), total_help, round(profit_if_sold_with_help,2)))
     
     return schedule
 
 def main():
+    #call a new function which pulls in all of the inputs needed and returns a dict or something which carries all of the info needed
+    #to do the calculations necessary to get the profit on a month per month basis
+
+    #need to update pandas columns to fit to the size they should be
+
     parser = argparse.ArgumentParser(description='This script finds out how much a mortgage really costs you in interest over a given amortization schedule and sends the outputs to an excel spreadsheet')
 
     parser.add_argument('-f', '--flaky-verdicts', action='store_true', help='Run only for flaky verdicts')
@@ -91,8 +103,7 @@ def main():
     #also need script input for everything else, should separate this from main so main can handle just the
     #user interaction and basic function calls
 
-    with pd.ExcelWriter("mortgage_amortization_schedule.xlsx") as writer:
-        #pd.set_option('max_colwidth', 5000) TODO: this doesn't work...how can I set column size?
+    with pd.ExcelWriter("mortgage_amortization_schedule.xlsx", engine='xlsxwriter') as writer:
         for house_value in house_value_list:
             opportunity_cost_base = house_value - (house_value*down_payment_multiplier) #down payment 
             for rate in annual_interest_rate_list:
@@ -105,7 +116,19 @@ def main():
                         # Convert to DataFrame
                         df = pd.DataFrame(amortization_schedule, columns=['Month', 'Monthly Payment', 'Interest Payment', 'Principal Payment', 'Remaining Balance', 'Opportunity Cost', 'Property Tax', 'Rent Saved', 'House Value', 'Expenses>Apartment', 'Maintenance Fees', 'Profit Sold EoM', 'Help', 'Profit with Help'])
                     # Save to Excel
-                    df.to_excel(writer, sheet_name=f'{house_value}_{rate}_{loan_length}', index=False)
+                    sheet_name = f'{house_value}_{rate}_{loan_length}'
+                    df.to_excel(writer, sheet_name, index=False)
+                    # Access the worksheet object to set column width
+                    workbook = writer.book
+                    worksheet = writer.sheets[sheet_name]
+
+                    # Set column widths based on content
+                    for idx, col in enumerate(df.columns):
+                        max_len = max(
+                            df[col].astype(str).map(len).max(),  # Length of largest item
+                            len(col)  # Length of column name/header
+                        )  # Adding a little padding
+                        worksheet.set_column(idx, idx, max_len)
             print(f'done {house_value}')
 
 if __name__ == '__main__':
