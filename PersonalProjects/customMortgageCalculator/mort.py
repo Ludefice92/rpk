@@ -9,20 +9,31 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 #TODO: add ad functionality
 #TODO: make a website for this instead of using localhost
+#TODO: add proper handling to ensure inputs are valid
+#TODO: update such that the output spreadsheet has the correct number of columns for every single type of situation (right now just printing 0s for columns that aren't relevant)
 
 def initialize_webpage():
     inputs = {}
     st.title("Property monthly profit calculator")
 
-    #TODO: need to add property management fees, rental increases for new home (if not primary residence)
     # Collect numeric inputs using text boxes
     primary_residence = st.radio("Is this property going to be your primary residence?", ("Yes", "No"))
     inputs["primary_residence"] = primary_residence
     if primary_residence == "No":
         rental_income_expected = st.radio("Is there expected rental income?", ("Yes", "No"))
+        inputs["rental_income_expected"] = rental_income_expected
         if rental_income_expected == "Yes":
             rental_income = st.text_input("How much rental income is expected per month?", value="0")
             inputs["rental_income"] = float(rental_income) if rental_income else 0.0
+            rental_income_annual_increase = st.text_input("How much will you increase the rent for your new property each year (in %)?", value="0")
+            inputs["rental_income_annual_increase"] = float(rental_income_annual_increase) if rental_income_annual_increase else 0.0
+            occupancy_rate = st.text_input("What is the occupancy rate of your new rental (in %, 95 is the max allowed)?", value="0")
+            inputs["occupancy_rate"] = float(occupancy_rate) if occupancy_rate else 0.0
+            is_property_managed = st.radio("Are you going to pay someone to manage your property for you?", ("Yes", "No"))
+            inputs["is_property_managed"] = is_property_managed
+            if is_property_managed == "Yes":
+                property_management_fees = st.text_input("How much are you going to pay your property manager (as a % of your rental income, standard is 10)?", value="0")
+                inputs["property_management_fees"] = float(property_management_fees) if property_management_fees else 0.0
     else:
         # Check if the user is moving from a rental property
         moving_from_rent = st.radio("Are you moving from a property which you currently rent?", ("Yes", "No"))
@@ -30,8 +41,7 @@ def initialize_webpage():
         if moving_from_rent == "Yes":
             current_rent = st.text_input("What is the monthly rent paid?", value="0")
             inputs["current_rent"] = float(current_rent) if current_rent else 0.0
-            annual_rent_increase = st.text_input("How much do you estimate your rent will go up each year (in %)?",
-                                                 value="0")
+            annual_rent_increase = st.text_input("How much do you estimate your current rent will go up each year (in %)?", value="0")
             inputs["annual_rent_increase"] = float(annual_rent_increase) if annual_rent_increase else 0.0
 
     # Check if the property is a condo
@@ -40,6 +50,8 @@ def initialize_webpage():
     if is_condo == "Yes":
         condo_fees = st.text_input("What are the monthly condo fees?", value="0")
         inputs["condo_fees"] = float(condo_fees) if condo_fees else 0.0
+        condo_fee_annual_increase = st.text_input("How much do the condo fees increase each year (in %)?", value="0")
+        inputs["condo_fee_annual_increase"] = float(condo_fee_annual_increase) if condo_fee_annual_increase else 0.0
 
     # Check if user is getting help from someone monthly to pay for their mortgage
     if_help = st.radio("Are you getting assistance from someone each month (renting a room, from parents, a partner, etc)?", ("Yes", "No"))
@@ -87,7 +99,7 @@ def initialize_webpage():
 
 def are_inputs_valid(inputs):
     # Check all required fields and print their values for debugging
-    print("Debug: Checking input values:", inputs)
+    #print("Debug: Checking input values:", inputs)
 
     required_keys = [
         "interest_rate", "house_price", "down_payment_percentage",
@@ -109,11 +121,24 @@ def are_inputs_valid(inputs):
         if not inputs.get("rental_income_amount"):
             print("Debug: Missing rental income amount")
             return_val = False
+        if not inputs.get("occupancy_rate"):
+            print("Debug: Missing rental income property occupancy rate")
+            return_val = False
+        if not inputs.get("rental_income_annual_increase"):
+            print("Debug: Missing rental income annual increase")
+            return_val = False
+        if inputs.get("is_property_managed") == "Yes" and not inputs.get("property_management_fees"):
+            print("Debug: Missing property management fees")
+            return_val = False
+
 
     # Check if the property is a condo and if the condo fees are provided
     if inputs.get("is_condo") == "Yes":
         if not inputs.get("condo_fees"):
             print("Debug: Missing condo fees")
+            return_val = False
+        if not inputs.get("condo_fee_annual_increase"):
+            print("Debug: Missing condo fee annual increase")
             return_val = False
 
     # Check if moving from rent and if the monthly rent amount is provided
@@ -161,11 +186,34 @@ def calculate_amortization_schedule(inputs):
     current_house_value = inputs.get("house_price") #will increment based on appreciation rate monthly
     appreciation_rate = (1+(inputs.get("appreciation_rate")*0.01))**(1/12) #converting user input to increment on a monthly equivalent basis
 
-    rent_increase_rate = 1 + inputs.get("annual_rent_increase") * 0.01
+    #condo specific
+    if inputs.get("is_condo") == "Yes":
+        condo_fee_annual_increase = 1 + inputs.get("condo_fee_annual_increase") * 0.01
+        condo_fee_base = inputs.get("condo_fees")
+    else:
+        condo_fee_annual_increase = 1
+        condo_fee_base = 0
+    #rent from old place before moving to new property
     if inputs.get("moving_from_rent") == "Yes":
+        rent_increase_rate = 1 + inputs.get("annual_rent_increase") * 0.01
         rent_base = inputs.get("current_rent") #updating this base value later as it changes every year
     else:
+        rent_increase_rate = 1
         rent_base = 0
+    #rental information for the new property if it is a non principal residence income property
+    if inputs.get("rental_income_expected") == "Yes":
+        rental_income_increase_rate = 1 + inputs.get("rental_income_annual_increase") * 0.01
+        rental_income_base = inputs.get("rental_income")
+        occupancy_rate = inputs.get("occupancy_rate") * 0.01
+    else:
+        rental_income_increase_rate = 1
+        rental_income_base = 0
+        occupancy_rate = 0
+    if inputs.get("is_property_managed") == "Yes":
+        property_management_fee_base = rental_income_base * inputs.get("property_management_fees") * 0.01
+    else:
+        property_management_fee_base = 0
+
     #used for profit calculation
     total_interest_paid = 0
     total_property_tax_paid = 0
@@ -174,6 +222,8 @@ def calculate_amortization_schedule(inputs):
     total_condo_fees_paid = 0
     total_help = 0
     total_rent_saved = rent_base
+    total_rental_income = rental_income_base
+    total_property_management_fees = property_management_fee_base
 
     #covering all possibilities for profitability given user inputs
     is_profitable = False
@@ -190,13 +240,20 @@ def calculate_amortization_schedule(inputs):
         if (month % 12) == 0: #increments costs which increase on an annual basis
             rent_base *= rent_increase_rate
             annual_property_tax_base *= annual_property_tax_increase
+            if inputs.get("rental_income_expected") == "Yes":
+                rental_income_base *= rental_income_increase_rate
+                if inputs.get("is_property_managed") == "Yes": property_management_fee_base = rental_income_base * inputs.get("property_management_fees") * 0.01
+            condo_fee_base *= condo_fee_annual_increase
         if month != 1:
             total_rent_saved += rent_base
+            total_rental_income += rental_income_base
+
         opportunity_cost *= sp500_return
         interest_payment = calculate_interest_payment(outstanding_balance, inputs.get("interest_rate"))
         principal_payment = monthly_payment - interest_payment
         outstanding_balance -= principal_payment
         total_interest_paid += interest_payment
+        total_property_management_fees += property_management_fee_base
         total_property_tax_paid += annual_property_tax_base/12 #converting annual property tax to monthly
         total_extra_monthly_expenses_paid += inputs.get("utilities_difference")
         total_maintenance_fees_paid += inputs.get("monthly_maintenance")
@@ -205,49 +262,53 @@ def calculate_amortization_schedule(inputs):
         profit_if_sold = ((current_house_value * agent_fee_multiplier) - land_transfer_tax - total_interest_paid -
                           opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid -
                           total_maintenance_fees_paid)
+        if inputs.get("is_condo") == "Yes":
+            total_condo_fees_paid += condo_fee_base
+            profit_if_sold -= total_condo_fees_paid
         profit_if_sold_with_rent_saved = profit_if_sold + total_rent_saved
         profit_if_sold_with_help = profit_if_sold + total_help
         profit_if_sold_rentsaved_help = profit_if_sold + total_rent_saved + total_help
-        #profit_if_sold_with_rental_income = profit_if_sold + total_rental_income
-        #profit_if_sold_rentalincome_help = profit_if_sold + total_rental_income + total_help
+        profit_if_sold_with_rental_income = profit_if_sold + (total_rental_income * occupancy_rate) - total_property_management_fees
+        profit_if_sold_rentalincome_help = profit_if_sold_with_rental_income + total_help
         if outstanding_balance<0: outstanding_balance = 0 #due to rounding it can be negative at the end
-        #TODO: add st.write webpage printouts which show the month which you reach profitability for each type of profit (with rent&no help, rent&help, help&no rent, with renting, etc)
+
+        #outputting month of profitability for each combination selling
         if not is_profitable and profit_if_sold > 0:
             is_profitable = True
             st.write(f"With no help, rental income, or saving rent from moving, you are profitable after {month} months")
-        if not is_profitable_saving_rent and profit_if_sold_with_rent_saved > 0:
+        if inputs.get("moving_from_rent")=="Yes" and not is_profitable_saving_rent and profit_if_sold_with_rent_saved > 0:
             is_profitable_saving_rent = True
-            st.write(f"With only saving ${rent_base}/month from your previous rental, you are profitable after {month} months")
-        if not is_profitable_with_help and profit_if_sold_with_help > 0:
+            st.write(f"With only saving ${inputs.get("current_rent")}/month from your previous rental, you are profitable after {month} months")
+        if inputs.get("help")=="Yes" and not is_profitable_with_help and profit_if_sold_with_help > 0:
             is_profitable_with_help = True
             st.write(f"With getting ${inputs.get("monthly_help")} in help/month, you are profitable after {month} months")
-        if not is_profitable_saverent_help and profit_if_sold_rentsaved_help > 0:
+        if inputs.get("moving_from_rent")=="Yes" and inputs.get("help")=="Yes" and not is_profitable_saverent_help and profit_if_sold_rentsaved_help > 0:
             is_profitable_saverent_help = True
-            st.write(f"With saving ${rent_base}/month from your previous rental and getting ${inputs.get("monthly_help")} in help/month, you are profitable after {month} months")
-        #if not is_profitable_renting and profit_if_sold_with_rental_income > 0:
-        #    is_profitable_renting = True
-        #    st.write(f"With renting your new property, you are profitable after {month} months")
-        #if not is_profitable_renting_help and profit_if_sold_rentalincome_help > 0:
-        #    is_profitable_renting_help = True
-        #    st.write(f"With renting your new property and getting help, you are profitable after {month} months")
+            st.write(f"With saving ${inputs.get("current_rent")}/month from your previous rental and getting {inputs.get("monthly_help")} in help/month, you are profitable after {month} months")
+        if inputs.get("rental_income_expected")=="Yes" and not is_profitable_renting and profit_if_sold_with_rental_income > 0:
+            is_profitable_renting = True
+            st.write(f"With renting your new property at ${inputs.get("rental_income")}/month, you are profitable after {month} months")
+        if inputs.get("rental_income_expected")=="Yes" and inputs.get("help")=="Yes" and not is_profitable_renting_help and profit_if_sold_rentalincome_help > 0:
+            is_profitable_renting_help = True
+            st.write(f"With renting your new property at ${inputs.get("rental_income")}/month and getting {inputs.get("monthly_help")} of help/month, you are profitable after {month} months")
 
         if inputs.get("is_condo") == "Yes":
-            total_condo_fees_paid += inputs.get("condo_fees")
-            profit_if_sold -= total_condo_fees_paid
             schedule.append((month, monthly_payment, interest_payment, principal_payment, round(outstanding_balance,2),
                              round((opportunity_cost-opportunity_cost_base),2), round(total_property_tax_paid,2),
                              round(current_house_value,2), total_extra_monthly_expenses_paid, total_maintenance_fees_paid,
-                             total_condo_fees_paid, round(profit_if_sold,2), total_help, round(profit_if_sold_with_help,2),
-                             round(total_rent_saved,2), round(profit_if_sold_with_rent_saved,2),
-                             round(profit_if_sold_rentsaved_help,2)))
+                             round(total_condo_fees_paid,2), round(profit_if_sold,2), total_help, round(profit_if_sold_with_help,2),
+                             round(total_rent_saved,2), round(total_rental_income,2), round(profit_if_sold_with_rent_saved,2),
+                             round(profit_if_sold_rentsaved_help,2), round(profit_if_sold_with_rental_income,2),
+                             round(profit_if_sold_rentalincome_help,2)))
         else:
             schedule.append((month, monthly_payment, interest_payment, principal_payment, round(outstanding_balance,2),
                              round((opportunity_cost-opportunity_cost_base),2), round(total_property_tax_paid,2),
                              round(current_house_value,2), total_extra_monthly_expenses_paid, total_maintenance_fees_paid,
                              round(profit_if_sold,2), total_help, round(profit_if_sold_with_help,2),
-                             round(total_rent_saved,2), round(profit_if_sold_with_rent_saved,2),
-                             round(profit_if_sold_rentsaved_help,2)))
-    
+                             round(total_rent_saved,2), round(total_rental_income,2), round(profit_if_sold_with_rent_saved,2),
+                             round(profit_if_sold_rentsaved_help,2), round(profit_if_sold_with_rental_income,2),
+                             round(profit_if_sold_rentalincome_help,2)))
+    print(f"schedule length: {len(schedule)}")
     return schedule
 
 def generate_monthly_property_profit_spreadsheet(inputs):
@@ -263,19 +324,21 @@ def generate_monthly_property_profit_spreadsheet(inputs):
         if inputs.get("is_condo") == "Yes":
             # Convert to DataFrame
             df = pd.DataFrame(amortization_schedule,
-                              columns=['Month', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
-                                       'Remaining Balance', 'Opportunity Cost', 'Property Tax','House Value',
-                                       'Expenses Compared to Last Home','Maintenance Fees','Condo Fees',
-                                       'Profit Sold EoM', 'Help','Profit with Help','Rent Saved','Profit if saving rent',
-                                       'Profit with rent saved&help'])
+                              columns=['Month After Purchase', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
+                                       'Remaining Balance', 'Opportunity Cost', 'Property Tax', 'House Value',
+                                       'Expenses Compared to Last Home', 'Maintenance Fees', 'Condo Fees',
+                                       'Profit', 'Help', 'Profit with Help', 'Rent Saved', 'Rental Income',
+                                       'Profit if Saving Rent', 'Profit with Rent Saved&Help', 'Profit with Rental Income',
+                                       'Profit with Rental Income&Help'])
         else:
             # Convert to DataFrame
             df = pd.DataFrame(amortization_schedule,
-                              columns=['Month', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
-                                       'Remaining Balance', 'Opportunity Cost', 'Property Tax','House Value',
-                                       'Expenses Compared to Last Home', 'Maintenance Fees','Profit Sold EoM', 'Help',
-                                       'Profit with Help', 'Rent Saved','Profit if saving rent',
-                                       'Profit with rent saved&help'])
+                              columns=['Month After Purchase', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
+                                       'Remaining Balance', 'Opportunity Cost', 'Property Tax', 'House Value',
+                                       'Expenses Compared to Last Home', 'Maintenance Fees', 'Profit', 'Help',
+                                       'Profit with Help', 'Rent Saved', 'Rental Income', 'Profit if Saving Rent',
+                                       'Profit with Rent Saved&Help', 'Profit with Rental Income',
+                                       'Profit with Rental Income&Help'])
         # Save to Excel
         sheet_name = f'${house_value}_{annual_interest_rate}%_{amortization_period}years'
         df.to_excel(writer, sheet_name, index=False)
