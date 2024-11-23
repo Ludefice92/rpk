@@ -9,7 +9,6 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 #TODO: add ad functionality
 #TODO: make a website for this instead of using localhost
-#TODO: add proper handling to ensure inputs are valid
 #TODO: update such that the output spreadsheet has the correct number of columns for every single type of situation (right now just printing 0s for columns that aren't relevant)
 
 def initialize_webpage():
@@ -97,17 +96,17 @@ def initialize_webpage():
 
     return inputs
 
+#TODO: when everything else is done, update this function to return false instead of setting a return_val to False and remove debug prints
 def are_inputs_valid(inputs):
     # Check all required fields and print their values for debugging
     #print("Debug: Checking input values:", inputs)
 
     required_keys = [
-        "interest_rate", "house_price", "down_payment_percentage",
-        "appreciation_rate", "amortization_period",
-        "property_taxes", "utilities_difference", "monthly_maintenance",
-        "land_transfer_tax", "real_estate_agent_fee", "annual_property_tax_increase"
+        "interest_rate", "house_price", "down_payment_percentage", "appreciation_rate", "amortization_period", "property_taxes",
+        "utilities_difference", "monthly_maintenance", "land_transfer_tax", "real_estate_agent_fee", "annual_property_tax_increase"
     ]
-
+    # TODO: nothing recognizes a 0 input, this is an issue for parameters where 0 is valid...maybe an issue with the way it's initially defined
+    # TODO: make these print statements st.write statements
     return_val = True
     # Check if any required field is missing or empty
     for key in required_keys:
@@ -116,45 +115,91 @@ def are_inputs_valid(inputs):
             print(f"Debug: Missing or empty input for {key}")
             return_val = False
 
+    if not inputs.get("interest_rate") or (inputs.get("interest_rate") <= 0 or inputs.get("interest_rate") > 20):
+        print("Debug: Missing interest_rate, or not above 0 and below or equal to 20")
+        return_val = False
+
+    if not inputs.get("house_price") or (inputs.get("house_price") < 50000 or inputs.get("house_price") > 50000000):
+        print("Debug: Missing house price, or it's not between 50000 and 50000000")
+        return_val = False
+
+    if not inputs.get("down_payment_percentage") or (inputs.get("down_payment_percentage") < 5 or inputs.get("down_payment_percentage") > 75):
+        print("Debug: Missing down payment %, or not above between 5 and 75%")
+        return_val = False
+
+    if not inputs.get("appreciation_rate") or (inputs.get("appreciation_rate") <= 0 or inputs.get("appreciation_rate") > 10):
+        print("Debug: Missing appreciation rate, or not above 0 and below or equal to 10")
+        return_val = False
+
+    if not inputs.get("amortization_period") or (inputs.get("amortization_period") < 1 or inputs.get("amortization_period") > 30):
+        print("Debug: Missing amortization period, or not between 1 and 30 years")
+        return_val = False
+
+    if not inputs.get("property_taxes") or (inputs.get("property_taxes") < 0 or inputs.get("property_taxes") > 50000):
+        print("Debug: Missing property taxes, or not between 0 and 50000/year")
+        return_val = False
+
+    if not inputs.get("utilities_difference") or (inputs.get("utilities_difference") < -2500 or inputs.get("utilities_difference") > 2500):
+        print("Debug: Missing utilities difference, or between -2500 and 2500")
+        return_val = False
+
+    if not inputs.get("monthly_maintenance") or (inputs.get("monthly_maintenance") < 100 or inputs.get("monthly_maintenance") > 5000):
+        print("Debug: Missing monthly maintenance, or not between 100 and 5000/month")
+        return_val = False
+
+    if not inputs.get("land_transfer_tax") or (inputs.get("land_transfer_tax") < 0 or inputs.get("land_transfer_tax") > 50000):
+        print("Debug: Missing land transfer tax, or it's negative or less than or more than 50000")
+        return_val = False
+
+    if not inputs.get("real_estate_agent_fee") or (inputs.get("real_estate_agent_fee") < 0 or inputs.get("real_estate_agent_fee") > 10):
+        print("Debug: Missing real estate agent fee, or it's not between 0 and 10%")
+        return_val = False
+
+    if not inputs.get("annual_property_tax_increase") or (inputs.get("annual_property_tax_increase") < 0 or inputs.get("annual_property_tax_increase") > 10):
+        print("Debug: Missing annual property tax increase, or not above 0 and below or equal to 10")
+        return_val = False
+
     # Check if rental income is expected and if the value is provided
     if inputs.get("expected_rental_income") == "Yes":
-        if not inputs.get("rental_income_amount"):
-            print("Debug: Missing rental income amount")
+        if not inputs.get("rental_income_amount") or (inputs.get("rental_income_amount")<=500 or inputs.get("rental_income_amount")>=50000):
+            print("Debug: Missing rental income amount, or not between 500 and 500000")
             return_val = False
-        if not inputs.get("occupancy_rate"):
-            print("Debug: Missing rental income property occupancy rate")
+        if not inputs.get("occupancy_rate") or (inputs.get("occupancy_rate")<50 or inputs.get("occupancy_rate")>95):
+            print("Debug: Missing rental income property occupancy rate, or not between 50 and 95%")
             return_val = False
-        if not inputs.get("rental_income_annual_increase"):
-            print("Debug: Missing rental income annual increase")
+        if not inputs.get("rental_income_annual_increase") or (inputs.get("rental_income_annual_increase")<=0 or inputs.get("rental_income_annual_increase")>20):
+            print("Debug: Missing rental income annual increase, or it's below/equal to 0 or >20%")
             return_val = False
-        if inputs.get("is_property_managed") == "Yes" and not inputs.get("property_management_fees"):
-            print("Debug: Missing property management fees")
+        if inputs.get("is_property_managed") == "Yes" and (not inputs.get("property_management_fees") or (inputs.get("property_management_fees")<1 or inputs.get("property_management_fees")>20)):
+            print("Debug: Missing property management fees, or the fees are not in between 1 and 20%")
             return_val = False
 
 
     # Check if the property is a condo and if the condo fees are provided
     if inputs.get("is_condo") == "Yes":
-        if not inputs.get("condo_fees"):
-            print("Debug: Missing condo fees")
+        if not inputs.get("condo_fees") or (inputs.get("condo_fees")<100 or inputs.get("condo_fees")>3500):
+            print("Debug: Missing condo fees, or it's not between 100 and 3500")
             return_val = False
-        if not inputs.get("condo_fee_annual_increase"):
-            print("Debug: Missing condo fee annual increase")
+        if not inputs.get("condo_fee_annual_increase") or (inputs.get("condo_fee_annual_increase")<=0 or inputs.get("condo_fee_annual_increase")>10):
+            print("Debug: Missing condo fee annual increase, or less than/equal 0 or >10%")
             return_val = False
 
     # Check if moving from rent and if the monthly rent amount is provided
     if inputs.get("moving_from_rent") == "Yes":
-        if not inputs.get("current_rent"):
-            print("Debug: Missing monthly rent")
+        if not inputs.get("current_rent") or (inputs.get("current_rent")<200 or inputs.get("current_rent")>5000):
+            print("Debug: Missing monthly rent, or not between 200 and 5000")
             return_val = False
-        if not inputs.get("annual_rent_increase"):
-            print("Debug: Missing annual rent increase")
+        if not inputs.get("annual_rent_increase") or (inputs.get("annual_rent_increase")<=0 or inputs.get("annual_rent_increase")>5000):
+            print("Debug: Missing annual rent increase, or not above 0 or less than or equal to 5000")
             return_val = False
 
     # Check if there is help from family, partner, etc
     if inputs.get("help") == "Yes":
-        if not inputs.get("monthly_help"):
-            print("Debug: Missing monthly help")
+        if not inputs.get("monthly_help") or (inputs.get("monthly_help")<50 or inputs.get("monthly_help")>20000):
+            print("Debug: Missing monthly help, or not between allowable range of 50 and 20000")
             return_val = False
+
+    print("\n\n\n\n\n")
 
     if return_val: print("Debug: All inputs are valid")
     return return_val
