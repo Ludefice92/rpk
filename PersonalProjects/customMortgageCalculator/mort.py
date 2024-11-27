@@ -10,6 +10,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 #TODO: add ad functionality
 #TODO: make a website for this instead of using localhost
 #TODO: update such that the output spreadsheet has the correct number of columns for every single type of situation (right now just printing 0s for columns that aren't relevant)
+#TODO: Maybe add an st.write that shows if a rental property cash flows or not on a monthly basis
 
 def initialize_webpage():
     inputs = {}
@@ -33,6 +34,11 @@ def initialize_webpage():
             if is_property_managed == "Yes":
                 property_management_fees = st.text_input("How much are you going to pay your property manager (as a % of your rental income, standard is 10)?", value="0")
                 inputs["property_management_fees"] = float(property_management_fees) if property_management_fees else 0.0
+            are_utilities_paid_by_renter = st.radio("Are there utilities that your renter is not paying for?",("Yes", "No"))
+            inputs["are_utilities_paid_by_renter"] = are_utilities_paid_by_renter
+            if are_utilities_paid_by_renter == "Yes":
+                total_utilities_not_paid_by_occupant = st.text_input("How much are you paying in utilities per month that your renter is not responsible for?",value="0")
+                inputs["total_utilities_not_paid_by_occupant"] = float(total_utilities_not_paid_by_occupant) if total_utilities_not_paid_by_occupant else 0.0
     else:
         # Check if the user is moving from a rental property
         moving_from_rent = st.radio("Are you moving from a property which you currently rent?", ("Yes", "No"))
@@ -42,6 +48,10 @@ def initialize_webpage():
             inputs["current_rent"] = float(current_rent) if current_rent else 0.0
             annual_rent_increase = st.text_input("How much do you estimate your current rent will go up each year (in %)?", value="0")
             inputs["annual_rent_increase"] = float(annual_rent_increase) if annual_rent_increase else 0.0
+        utilities_difference = st.text_input(
+            "How much more do you expect to pay in utilities compared to your current residence? (Negative value if less, 0 if same)",
+            value="0")
+        inputs["utilities_difference"] = float(utilities_difference) if utilities_difference else 0.0
 
     # Check if the property is a condo
     is_condo = st.radio("Is the property a condo?", ("Yes", "No"))
@@ -89,11 +99,6 @@ def initialize_webpage():
     maintenance_budget = st.text_input("What is your expected monthly maintenance fee budget?", value="0")
     inputs["monthly_maintenance"] = float(maintenance_budget) if maintenance_budget else 0.0
 
-    utilities_difference = st.text_input(
-        "How much more do you expect to pay in utilities compared to your current property? (Negative value if less, 0 if same)",
-        value="0")
-    inputs["utilities_difference"] = float(utilities_difference) if utilities_difference else 0.0
-
     return inputs
 
 #TODO: when everything else is done, update this function to return false instead of setting a return_val to False and remove debug prints
@@ -103,7 +108,7 @@ def are_inputs_valid(inputs):
 
     required_keys = [
         "interest_rate", "house_price", "down_payment_percentage", "appreciation_rate", "amortization_period", "property_taxes",
-        "utilities_difference", "monthly_maintenance", "land_transfer_tax", "real_estate_agent_fee", "annual_property_tax_increase"
+        "monthly_maintenance", "land_transfer_tax", "real_estate_agent_fee", "annual_property_tax_increase"
     ]
     # TODO: nothing recognizes a 0 input, this is an issue for parameters where 0 is valid...maybe an issue with the way it's initially defined
     # TODO: make these print statements st.write statements
@@ -139,10 +144,6 @@ def are_inputs_valid(inputs):
         print("Debug: Missing property taxes, or not between 0 and 50000/year")
         return_val = False
 
-    if not inputs.get("utilities_difference") or (inputs.get("utilities_difference") < -2500 or inputs.get("utilities_difference") > 2500):
-        print("Debug: Missing utilities difference, or between -2500 and 2500")
-        return_val = False
-
     if not inputs.get("monthly_maintenance") or (inputs.get("monthly_maintenance") < 100 or inputs.get("monthly_maintenance") > 5000):
         print("Debug: Missing monthly maintenance, or not between 100 and 5000/month")
         return_val = False
@@ -173,6 +174,9 @@ def are_inputs_valid(inputs):
         if inputs.get("is_property_managed") == "Yes" and (not inputs.get("property_management_fees") or (inputs.get("property_management_fees")<1 or inputs.get("property_management_fees")>20)):
             print("Debug: Missing property management fees, or the fees are not in between 1 and 20%")
             return_val = False
+        if not inputs.get("total_utilities_not_paid_by_occupant") or (inputs.get("total_utilities_not_paid_by_occupant") < 50 or inputs.get("total_utilities_not_paid_by_occupant") > 2500):
+            print("Debug: Missing utilities not paid by the renter, or not between 50 and 2500")
+            return_val = False
 
 
     # Check if the property is a condo and if the condo fees are provided
@@ -191,6 +195,9 @@ def are_inputs_valid(inputs):
             return_val = False
         if not inputs.get("annual_rent_increase") or (inputs.get("annual_rent_increase")<=0 or inputs.get("annual_rent_increase")>5000):
             print("Debug: Missing annual rent increase, or not above 0 or less than or equal to 5000")
+            return_val = False
+        if not inputs.get("utilities_difference") or (inputs.get("utilities_difference") < -2500 or inputs.get("utilities_difference") > 2500):
+            print("Debug: Missing utilities difference, or between -2500 and 2500")
             return_val = False
 
     # Check if there is help from family, partner, etc
@@ -250,14 +257,24 @@ def calculate_amortization_schedule(inputs):
         rental_income_increase_rate = 1 + inputs.get("rental_income_annual_increase") * 0.01
         rental_income_base = inputs.get("rental_income")
         occupancy_rate = inputs.get("occupancy_rate") * 0.01
+        if inputs.get("are_utilities_paid_by_renter") == "Yes":
+            utilities_not_paid_by_occupant = 0
+        else:
+            utilities_not_paid_by_occupant = inputs.get("total_utilities_not_paid_by_occupant")
     else:
         rental_income_increase_rate = 1
         rental_income_base = 0
         occupancy_rate = 0
+        utilities_not_paid_by_occupant = 0
     if inputs.get("is_property_managed") == "Yes":
         property_management_fee_base = rental_income_base * inputs.get("property_management_fees") * 0.01
     else:
         property_management_fee_base = 0
+
+    if inputs["primary_residence"] == "Yes":
+        extra_monthly_expenses = inputs.get("utilities_difference")
+    else:
+        extra_monthly_expenses = 0
 
     #used for profit calculation
     total_interest_paid = 0
@@ -269,6 +286,7 @@ def calculate_amortization_schedule(inputs):
     total_rent_saved = rent_base
     total_rental_income = rental_income_base
     total_property_management_fees = property_management_fee_base
+    total_utilities_not_paid_by_renter = 0
 
     #covering all possibilities for profitability given user inputs
     is_profitable = False
@@ -300,13 +318,14 @@ def calculate_amortization_schedule(inputs):
         total_interest_paid += interest_payment
         total_property_management_fees += property_management_fee_base
         total_property_tax_paid += annual_property_tax_base/12 #converting annual property tax to monthly
-        total_extra_monthly_expenses_paid += inputs.get("utilities_difference")
+        total_extra_monthly_expenses_paid += extra_monthly_expenses
+        total_utilities_not_paid_by_renter += utilities_not_paid_by_occupant
         total_maintenance_fees_paid += inputs.get("monthly_maintenance")
         if inputs.get("help") == "Yes": total_help += inputs.get("monthly_help")
         current_house_value *= appreciation_rate
         profit_if_sold = ((current_house_value * agent_fee_multiplier) - land_transfer_tax - total_interest_paid -
                           opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid -
-                          total_maintenance_fees_paid)
+                          total_maintenance_fees_paid - total_utilities_not_paid_by_renter)
         if inputs.get("is_condo") == "Yes":
             total_condo_fees_paid += condo_fee_base
             profit_if_sold -= total_condo_fees_paid
@@ -323,19 +342,19 @@ def calculate_amortization_schedule(inputs):
             st.write(f"With no help, rental income, or saving rent from moving, you are profitable after {month} months")
         if inputs.get("moving_from_rent")=="Yes" and not is_profitable_saving_rent and profit_if_sold_with_rent_saved > 0:
             is_profitable_saving_rent = True
-            st.write(f"With only saving ${inputs.get("current_rent")}/month from your previous rental, you are profitable after {month} months")
+            st.write(f"With only saving ${inputs.get("current_rent"):.2f}/month from your previous rental, you are profitable after {month} months")
         if inputs.get("help")=="Yes" and not is_profitable_with_help and profit_if_sold_with_help > 0:
             is_profitable_with_help = True
-            st.write(f"With getting ${inputs.get("monthly_help")} in help/month, you are profitable after {month} months")
+            st.write(f"With getting ${inputs.get("monthly_help"):.2f} in help/month, you are profitable after {month} months")
         if inputs.get("moving_from_rent")=="Yes" and inputs.get("help")=="Yes" and not is_profitable_saverent_help and profit_if_sold_rentsaved_help > 0:
             is_profitable_saverent_help = True
-            st.write(f"With saving ${inputs.get("current_rent")}/month from your previous rental and getting {inputs.get("monthly_help")} in help/month, you are profitable after {month} months")
+            st.write(f"With saving ${inputs.get("current_rent"):.2f}/month from your previous rental and getting {inputs.get("monthly_help"):.2f} in help/month, you are profitable after {month} months")
         if inputs.get("rental_income_expected")=="Yes" and not is_profitable_renting and profit_if_sold_with_rental_income > 0:
             is_profitable_renting = True
-            st.write(f"With renting your new property at ${inputs.get("rental_income")}/month, you are profitable after {month} months")
+            st.write(f"With renting your new property at ${inputs.get("rental_income"):.2f}/month, you are profitable after {month} months")
         if inputs.get("rental_income_expected")=="Yes" and inputs.get("help")=="Yes" and not is_profitable_renting_help and profit_if_sold_rentalincome_help > 0:
             is_profitable_renting_help = True
-            st.write(f"With renting your new property at ${inputs.get("rental_income")}/month and getting {inputs.get("monthly_help")} of help/month, you are profitable after {month} months")
+            st.write(f"With renting your new property at ${inputs.get("rental_income"):.2f}/month and getting {inputs.get("monthly_help"):.2f} of help/month, you are profitable after {month} months")
 
         if inputs.get("is_condo") == "Yes":
             schedule.append((month, monthly_payment, interest_payment, principal_payment, round(outstanding_balance,2),
@@ -353,7 +372,7 @@ def calculate_amortization_schedule(inputs):
                              round(total_rent_saved,2), round(total_rental_income,2), round(profit_if_sold_with_rent_saved,2),
                              round(profit_if_sold_rentsaved_help,2), round(profit_if_sold_with_rental_income,2),
                              round(profit_if_sold_rentalincome_help,2)))
-    print(f"schedule length: {len(schedule)}")
+
     return schedule
 
 def generate_monthly_property_profit_spreadsheet(inputs):
