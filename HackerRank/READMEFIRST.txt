@@ -15,7 +15,7 @@ Hard Problems: INCOMPLETE
 Python:
 Easy Problems: DONE
 Medium Problems: DONE
-Hard Problems: INCOMPLETE
+Hard Problems: DONE
 
 Java:
 Easy Problems: DONE
