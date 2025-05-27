@@ -10,7 +10,6 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 #TODO: add ad functionality
 #TODO: make a website for this instead of using localhost
 #TODO: update such that the output spreadsheet has the correct number of columns for every single type of situation (right now just printing 0s for columns that aren't relevant)
-#TODO: Maybe add an st.write that shows if a rental property cash flows or not on a monthly basis
 #TODO: Convert this implementation from streamlit to flask
 
 def initialize_webpage():
@@ -296,6 +295,7 @@ def calculate_amortization_schedule(inputs):
     is_profitable_saverent_help = False
     is_profitable_renting = False
     is_profitable_renting_help = False
+    is_cash_flowing = False
 
 
     schedule = []
@@ -373,6 +373,17 @@ def calculate_amortization_schedule(inputs):
                              round(total_rent_saved,2), round(total_rental_income,2), round(profit_if_sold_with_rent_saved,2),
                              round(profit_if_sold_rentsaved_help,2), round(profit_if_sold_with_rental_income,2),
                              round(profit_if_sold_rentalincome_help,2)))
+
+            # Calculate if the property is cash flowing (for rental properties)
+            if not is_cash_flowing and inputs.get("primary_residence") == "No" and inputs.get("rental_income_expected") == "Yes":
+                monthly_cash_flow = (rental_income_base * occupancy_rate) - monthly_payment - (annual_property_tax_base / 12) - inputs.get("monthly_maintenance") - condo_fee_base - property_management_fee_base - utilities_not_paid_by_occupant
+                if inputs.get("help") == "Yes":
+                    monthly_cash_flow += inputs.get("monthly_help")
+                if monthly_cash_flow > 0:
+                    is_cash_flowing = True
+                    st.write(f"The property is cash flowing with an initial monthly cash flow of ${monthly_cash_flow:.2f} in month {month}")
+                elif month == inputs.get("amortization_period") * 12:
+                    st.write(f"The property is not cash flowing, with an initial monthly loss of ${-monthly_cash_flow:.2f}")
 
     return schedule
 
