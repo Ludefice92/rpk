@@ -98,6 +98,14 @@ def initialize_webpage():
     maintenance_budget = st.text_input("What is your expected monthly maintenance fee budget?", value="0")
     inputs["monthly_maintenance"] = float(maintenance_budget) if maintenance_budget else 0.0
 
+    is_taxed = st.radio("Will there be a tax on the sale of the property?", ("Yes", "No"))
+    inputs["is_taxed"] = is_taxed
+    if is_taxed == "Yes":
+        tax_percentage = st.text_input("What is the tax percentage on the capital gain?", value="0")
+        inputs["tax_percentage"] = float(tax_percentage) if tax_percentage else 0.0
+        factor = st.text_input("What is the factor at which the capital gain is taxed (e.g., 0.5 for 50% taxable)?", value="0")
+        inputs["factor"] = float(factor) if factor else 0.0
+
     return inputs
 
 #TODO: when everything else is done, update this function to return false instead of setting a return_val to False and remove debug prints
@@ -203,6 +211,14 @@ def are_inputs_valid(inputs):
     if inputs.get("help") == "Yes":
         if not inputs.get("monthly_help") or (inputs.get("monthly_help")<50 or inputs.get("monthly_help")>20000):
             print("Debug: Missing monthly help, or not between allowable range of 50 and 20000")
+            return_val = False
+
+    if inputs.get("is_taxed") == "Yes":
+        if not inputs.get("tax_percentage") or (inputs.get("tax_percentage") <= 0 or inputs.get("tax_percentage") >= 100):
+            print("Debug: Invalid tax percentage, must be greater than 0 and less than 100")
+            return_val = False
+        if not inputs.get("factor") or (inputs.get("factor") <= 0 or inputs.get("factor") > 1):
+            print("Debug: Invalid factor, must be greater than 0 and less than or equal to 1")
             return_val = False
 
     print("\n\n\n\n\n")
@@ -322,9 +338,14 @@ def calculate_amortization_schedule(inputs):
         total_maintenance_fees_paid += inputs.get("monthly_maintenance")
         if inputs.get("help") == "Yes": total_help += inputs.get("monthly_help")
         current_house_value *= appreciation_rate
+        if inputs.get("is_taxed") == "Yes":
+            capital_gain = current_house_value - inputs["house_price"]
+            capital_gains_tax = capital_gain * inputs["factor"] * (inputs["tax_percentage"] / 100)
+        else:
+            capital_gains_tax = 0
         profit_if_sold = ((current_house_value * agent_fee_multiplier) - land_transfer_tax - total_interest_paid -
                           opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid -
-                          total_maintenance_fees_paid - total_utilities_not_paid_by_renter)
+                          total_maintenance_fees_paid - total_utilities_not_paid_by_renter - capital_gains_tax)
         if inputs.get("is_condo") == "Yes":
             total_condo_fees_paid += condo_fee_base
             profit_if_sold -= total_condo_fees_paid
