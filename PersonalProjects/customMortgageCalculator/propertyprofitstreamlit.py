@@ -646,6 +646,26 @@ def main():
             generate_monthly_property_profit_spreadsheet(inputs)
         else:
             st.error("Please fill out all required fields correctly before calculating.")
+    
+    # PayPal donation button at the bottom of the page
+    st.markdown("---")  # Add a separator line
+    st.markdown("### Support This Tool")
+    st.markdown("If you find this property profit calculator helpful, consider supporting the development and hosting costs:")
+    
+    # PayPal donation form
+    paypal_html = """
+    <form action="https://www.paypal.com/donate" method="post" target="_top">
+    <input type="hidden" name="business" value="ZF94BFC7ZMLNG" />
+    <input type="hidden" name="no_recurring" value="0" />
+    <input type="hidden" name="item_name" value="Support this page to help pay for hosting fees." />
+    <input type="hidden" name="currency_code" value="CAD" />
+    <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+    <img alt="" border="0" src="https://www.paypal.com/en_CA/i/scr/pixel.gif" width="1" height="1" />
+    </form>
+    """
+    
+    st.markdown(paypal_html, unsafe_allow_html=True)
+    st.markdown("*Thank you for your support!*")
 
 if __name__ == '__main__':
     main()
