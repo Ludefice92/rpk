@@ -636,13 +636,6 @@ def main():
     # Create columns for layout: left ad, main content, right ad
     col1, col2, col3 = st.columns([1, 6, 1])
                    
-                                                                                           
-                                        
-                           
-                                   
-                                    
-        
-
     # Left ad column
     with col1:
         st.header("Ads")
@@ -681,7 +674,6 @@ def main():
 
         inputs = initialize_webpage()
                                                                              
-
         # Initialize session state for input validation
         if "inputs_valid" not in st.session_state:
             st.session_state.inputs_valid = False
@@ -700,22 +692,10 @@ def main():
             else:
                 col2.error("Please fill out all required fields correctly before calculating.")
     
-                         
-                      
-                                          
-    
-                                                               
-                       
-                                  
-                                                                          
-                                                         
-                                                                            
-        
         # Information section
         col2.markdown("---")
         col2.subheader("ℹ️ About This Tool")
-                                                    
-        
+ 
         with col2.expander("How Property Investment Analysis Works"):
             col2.markdown("""
             **Mortgage Calculations:**

@@ -192,212 +192,208 @@ def formatAndDisplayTable(display_df):
     st.markdown(table_html, unsafe_allow_html=True)
 
 def main():
-    st.title("🏦 GIS and CPP Optimizer")
-    st.markdown("### Optimize your Canada Pension Plan (CPP) start age to maximize lifetime benefits")
+    col1, col2, col3 = st.columns([1, 6, 1])
     
-    st.markdown("""
-    This tool helps you determine the optimal age to start receiving CPP benefits by considering:
-    - CPP adjustment factors (early/late pension)
-    - Guaranteed Income Supplement (GIS) interactions
-    - Your life expectancy
-    - Total lifetime benefit optimization
-    """)
-    
-    # Sidebar for inputs
-    st.sidebar.header("📊 Input Parameters")
-    
-    # Input fields
-    gis_monthly = st.sidebar.number_input(
-        "GIS Monthly Amount ($CAD)",
-        min_value=0.0,
-        max_value=3000.0,
-        value=1100.0,
-        step=10.0,
-        help="Your expected monthly Guaranteed Income Supplement amount"
-    )
-    
-    cpp_monthly = st.sidebar.number_input(
-        "CPP Monthly Amount at Age 65 ($CAD)",
-        min_value=0.0,
-        max_value=5000.0,
-        value=1400.0,
-        step=10.0,
-        help="Your expected monthly CPP amount if you start at age 65"
-    )
+    with col1:
+        st.header("Ads")
+        st.html("""
+        <div style="background-color: #f0f0f0; padding: 10px; text-align: center;">
+            <p>Debt Consolidation for Seniors</p>
+            <p>Consolidate your debts and save on interest!</p>
+            <a href="https://example.com/debt-consolidation" target="_blank">Learn More</a>
+        </div>
+        """)
 
-    other_taxable_monthly = st.sidebar.number_input(
-        "Other monthly taxable income ($CAD)",
-        min_value=0,
-        max_value=20000,
-        value=0,
-        step=10,
-        help="How much you make from all taxable income sources per month, except for CPP/OAS/GIS"
-    )
+    with col3:
+        st.header("Ads")
+        st.html("""
+        <div style="background-color: #f0f0f0; padding: 10px; text-align: center;">
+            <p>Reverse Mortgages for 50+</p>
+            <p>Access your home equity without monthly payments!</p>
+            <a href="https://example.com/reverse-mortgage" target="_blank">Get Started</a>
+        </div>
+        """)
+
+    with col2:
+        col2.title("🏦 GIS and CPP Optimizer")
+        col2.markdown("### Optimize your Canada Pension Plan (CPP) start age to maximize lifetime benefits")
+        
+        col2.markdown("""
+        This tool helps you determine the optimal age to start receiving CPP benefits by considering:
+        - CPP adjustment factors (early/late pension)
+        - Guaranteed Income Supplement (GIS) interactions
+        - Your life expectancy
+        - Total lifetime benefit optimization
+        """)
+        # Moved from sidebar
+        col2.header("📊 Input Parameters")
     
-    life_expectancy = st.sidebar.number_input(
-        "Life Expectancy (years)",
-        min_value=60,
-        max_value=130,
-        value=80,
-        step=1,
-        help="Your estimated life expectancy"
-    )
-    
-    # Validate inputs
-    validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly)
-    
-    if validation_errors:
-        st.error("Please fix the following input errors:")
-        for error in validation_errors:
-            st.error(f"• {error}")
-        return
-    
-    # Calculate optimization results
-    if st.sidebar.button("🔍 Optimize CPP Start Age", type="primary"):
-        with st.spinner("Calculating optimal CPP start age..."):
-            results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly)
-            
-            # Find optimal age
-            optimal_idx = results_df['total_lifetime_income'].idxmax()
-            optimal_result = results_df.loc[optimal_idx]
-            
-            # Display results
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
+        # Input fields
+        gis_monthly = col2.number_input(
+            "GIS Monthly Amount ($CAD)",
+            min_value=0.0,
+            max_value=3000.0,
+            value=1100.0,
+            step=10.0,
+            help="Your expected monthly Guaranteed Income Supplement amount"
+        )
+        
+        cpp_monthly = col2.number_input(
+            "CPP Monthly Amount at Age 65 ($CAD)",
+            min_value=0.0,
+            max_value=5000.0,
+            value=1400.0,
+            step=10.0,
+            help="Your expected monthly CPP amount if you start at age 65"
+        )
+
+        other_taxable_monthly = col2.number_input(
+            "Other monthly taxable income ($CAD)",
+            min_value=0,
+            max_value=20000,
+            value=0,
+            step=10,
+            help="How much you make from all taxable income sources per month, except for CPP/OAS/GIS"
+        )
+        
+        life_expectancy = col2.number_input(
+            "Life Expectancy (years)",
+            min_value=60,
+            max_value=130,
+            value=80,
+            step=1,
+            help="Your estimated life expectancy"
+        )
+        
+        # Validate inputs
+        validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly)
+        
+        if validation_errors:
+            col2.error("Please fix the following input errors:")
+            for error in validation_errors:
+                col2.error(f"• {error}")
+            return
+        
+        # Calculate optimization results
+        if col2.button("🔍 Optimize CPP Start Age", type="primary"):
+            with st.spinner("Calculating optimal CPP start age..."):
+                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly)
+                
+                # Find optimal age
+                optimal_idx = results_df['total_lifetime_income'].idxmax()
+                optimal_result = results_df.loc[optimal_idx]
+                
+                # Display results
+                col1, col2, col3 = st.columns(3)
+                
                 st.metric(
                     "🎯 Optimal CPP Start Age",
                     f"{int(optimal_result['start_age'])} years",
                     help="Age that maximizes total lifetime income"
                 )
-            
-            with col2:
+                
                 st.metric(
                     "💰 Maximum Total Lifetime Income",
                     f"${optimal_result['total_lifetime_income']:,.0f}",
                     help="Total income over your lifetime"
                 )
-            
-            #with col3:
-            #    st.metric(
-            #        "📅 Monthly Benefits at Optimal Age",
-            #        f"${optimal_result['total_monthly']:.0f}",
-            #        help="Combined CPP + GIS monthly amount"
-            #    )
-            
-            # Create and display visualizations
-            st.subheader("📈 Optimization Analysis")
-            fig = create_visualization(results_df)
-            st.pyplot(fig)
-            
-            # Display detailed results table
-            st.subheader("📋 Detailed Results")
-            
-            # Format the dataframe for display
-            display_df = results_df.copy()
-            
-            # Rename columns for display
-            display_df.columns = [
-                'Start Age', 'Lifetime CPP ($)', 'Lifetime GIS ($)',
-                'Lifetime Other Taxable Income ($)', 'Total Lifetime Income ($)'
-            ]
+                
+                #    st.metric(
+                #        "📅 Monthly Benefits at Optimal Age",
+                #        f"${optimal_result['total_monthly']:.0f}",
+                #        help="Combined CPP + GIS monthly amount"
+                #    )
+                
+                # Create and display visualizations
+                st.subheader("📈 Optimization Analysis")
+                fig = create_visualization(results_df)
+                st.pyplot(fig)
+                
+                # Display detailed results table
+                st.subheader("📋 Detailed Results")
+                
+                # Format the dataframe for display
+                display_df = results_df.copy()
+                
+                # Rename columns for display
+                display_df.columns = [
+                    'Start Age', 'Lifetime CPP ($)', 'Lifetime GIS ($)',
+                    'Lifetime Other Taxable Income ($)', 'Total Lifetime Income ($)'
+                ]
 
-            # Format values
-            display_df['Start Age'] = display_df['Start Age'].astype(int)
+                # Format values
+                display_df['Start Age'] = display_df['Start Age'].astype(int)
 
-            for col in display_df.columns:
-                if col != 'Start Age':
-                    display_df[col] = display_df[col].map(lambda x: f"{x:,.2f}")
+                for col in display_df.columns:
+                    if col != 'Start Age':
+                        display_df[col] = display_df[col].map(lambda x: f"{x:,.2f}")
 
-            formatAndDisplayTable(display_df)
-            
-            # Key insights
-            st.subheader("🔍 Key Insights")
-            
-            early_benefit = results_df.loc[results_df['start_age'] == 60, 'total_lifetime_income'].iloc[0]
-            late_benefit = results_df.loc[results_df['start_age'] == 70, 'total_lifetime_income'].iloc[0]
-            optimal_benefit = optimal_result['total_lifetime_income']
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.info(f"""
-                **Early vs Optimal:**
-                - Starting at 60: ${early_benefit:,.0f}
-                - Starting at {int(optimal_result['start_age'])}: ${optimal_benefit:,.0f}
-                - Difference: ${optimal_benefit - early_benefit:,.0f}
-                """)
-            
-            with col2:
-                st.info(f"""
-                **Late vs Optimal:**
-                - Starting at 70: ${late_benefit:,.0f}
-                - Starting at {int(optimal_result['start_age'])}: ${optimal_benefit:,.0f}
-                - Difference: ${optimal_benefit - late_benefit:,.0f}
-                """)
-            
-            # Download option
-            csv = results_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Results as CSV",
-                data=csv,
-                file_name=f"cpp_optimization_results_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv"
-            )
-    
-    # Information section
-    st.markdown("---")
-    st.subheader("ℹ️ About This Tool")
-    
-    with st.expander("How CPP Adjustments Work"):
-        st.markdown("""
-        **Early Pension (Age 60-64):**
-        - CPP is reduced by 0.6% for each month before age 65
-        - Maximum reduction: 36% if you start at age 60
+                formatAndDisplayTable(display_df)
+                
+                col1, col2 = st.columns(2)
+                
+                # Download option
+                csv = results_df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download Results as CSV",
+                    data=csv,
+                    file_name=f"cpp_optimization_results_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
         
-        **Standard Pension (Age 65):**
-        - No adjustment - you receive 100% of your calculated CPP
+        # Information section
+        st.markdown("---")
+        st.subheader("ℹ️ About This Tool")
         
-        **Late Pension (Age 66-70):**
-        - CPP is increased by 0.7% for each month after age 65
-        - Maximum increase: 42% if you start at age 70
-        """)
-    
-    with st.expander("GIS Interaction"):
-        st.markdown("""
-        **Guaranteed Income Supplement (GIS):**
-        - GIS is reduced based on other pension income
-        - Generally reduced by $1 for every $2 of CPP income above a threshold
-        - This interaction affects the optimal CPP start age
-        - Higher CPP payments may reduce GIS eligibility
-        """) #TODO: this is a wrong description of GIS, fix it
-    
-    with st.expander("Important Disclaimers"):
-        st.markdown("""
-        **⚠️ Important Notes:**
-        - This tool provides estimates based on simplified calculations
-        - Actual CPP and GIS amounts depend on many factors including contribution history
-        - GIS eligibility and amounts are subject to annual income testing
-        - Consult with a financial advisor for personalized advice
-        - Government benefit rules may change over time
-        """)
+        with st.expander("How CPP Adjustments Work"):
+            st.markdown("""
+            **Early Pension (Age 60-64):**
+            - CPP is reduced by 0.6% for each month before age 65
+            - Maximum reduction: 36% if you start at age 60
+            
+            **Standard Pension (Age 65):**
+            - No adjustment - you receive 100% of your calculated CPP
+            
+            **Late Pension (Age 66-70):**
+            - CPP is increased by 0.7% for each month after age 65
+            - Maximum increase: 42% if you start at age 70
+            """)
+        
+        with st.expander("GIS Interaction"):
+            st.markdown("""
+            **Guaranteed Income Supplement (GIS):**
+            - GIS is reduced based on other pension income
+            - Generally reduced by $1 for every $2 of CPP income above a threshold
+            - This interaction affects the optimal CPP start age
+            - Higher CPP payments may reduce GIS eligibility
+            """) #TODO: this is a wrong description of GIS, fix it
+        
+        with st.expander("Important Disclaimers"):
+            st.markdown("""
+            **⚠️ Important Notes:**
+            - This tool provides estimates based on simplified calculations
+            - Actual CPP and GIS amounts depend on many factors including contribution history
+            - GIS eligibility and amounts are subject to annual income testing
+            - Consult with a financial advisor for personalized advice
+            - Government benefit rules may change over time
+            """)
 
-    # PayPal donation button at the bottom
-    st.markdown("---")
-    st.markdown("### 💝 Support This Tool")
-    st.markdown("If you found this GIS and CPP optimizer helpful, consider supporting its development:")
-    
-    # PayPal donation button HTML
-    paypal_html = """
-    <form action="https://www.paypal.com/donate" method="post" target="_top">
-    <input type="hidden" name="hosted_button_id" value="YOUR_PAYPAL_BUTTON_ID" />
-    <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
-    <img alt="" border="0" src="https://www.paypal.com/en_CA/i/scr/pixel.gif" width="1" height="1" />
-    </form>
-    """
-    
-    st.markdown(paypal_html, unsafe_allow_html=True)
-    st.markdown("*Your support helps maintain and improve this free tool for everyone!*")
+        # PayPal donation button at the bottom
+        st.markdown("---")
+        st.markdown("### 💝 Support This Tool")
+        st.markdown("If you found this GIS and CPP optimizer helpful, consider supporting its development:")
+        
+        # PayPal donation button HTML
+        paypal_html = """
+        <form action="https://www.paypal.com/donate" method="post" target="_top">
+        <input type="hidden" name="hosted_button_id" value="YOUR_PAYPAL_BUTTON_ID" />
+        <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+        <img alt="" border="0" src="https://www.paypal.com/en_CA/i/scr/pixel.gif" width="1" height="1" />
+        </form>
+        """
+        
+        st.markdown(paypal_html, unsafe_allow_html=True)
+        st.markdown("*Your support helps maintain and improve this free tool for everyone!*")
 
 if __name__ == "__main__":
     main()
