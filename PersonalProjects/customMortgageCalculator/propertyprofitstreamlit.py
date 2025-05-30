@@ -633,85 +633,151 @@ def main():
         initial_sidebar_state="expanded"
     )
 
-    st.title("🏠 Property Profit Calculator")
-    st.markdown("### Calculate month by month profit for your property investment")
-    st.markdown("""
-    This tool helps you analyze the profitability of your property purchase by considering:
-    - Mortgage payments and amortization
-    - Property appreciation
-    - Rental income (if applicable)
-    - Various expenses and scenarios
-    """)
-
-    inputs = initialize_webpage()
-
-    # Initialize session state for input validation
-    if "inputs_valid" not in st.session_state:
-        st.session_state.inputs_valid = False
-
-    # Validate inputs and update session state
-    st.session_state.inputs_valid = are_inputs_valid(inputs)
-
-    # Display a submit button
-    calculate_button = st.button("Calculate Profit if Sold on Monthly Basis")
-
-    # Only call the calculation function if inputs are valid and the button is clicked
-    if calculate_button:
-        if st.session_state.inputs_valid:
-            st.success("All inputs are valid. Performing calculations...")
-            generate_monthly_property_profit_spreadsheet(inputs)
-        else:
-            st.error("Please fill out all required fields correctly before calculating.")
-    
-    # Information section
-    st.markdown("---")
-    st.subheader("ℹ️ About This Tool")
-    
-    with st.expander("How the Calculations Work"):
-        st.markdown("""
-        **Mortgage Amortization:**
-        - Uses standard amortization formula for monthly payments
-        - Tracks principal and interest portions each month
-        - Accounts for property appreciation and opportunity costs
+    # Create columns for layout: left ad, main content, right ad
+    col1, col2, col3 = st.columns([1, 6, 1])
+                   
+                                                                                           
+                                        
+                           
+                                   
+                                    
         
-        **Profit Scenarios:**
-        - Calculates multiple scenarios including rental income, help, and rent savings
-        - Includes taxes, maintenance, and other expenses
-        """)
-    
-    with st.expander("Important Assumptions"):
-        st.markdown("""
-        - S&P 500 return of 0.57% monthly for opportunity cost (based on 8% historical annual gain)
-        - Annual increases applied monthly where appropriate
-        """)
-    
-    with st.expander("Disclaimers"):
-        st.markdown("""
-        **⚠️ Important Notes:**
-        - This is for informational purposes only
-        - Actual results may vary based on market conditions
-        - Consult a financial advisor for personalized advice
+
+    # Left ad column
+    with col1:
+        st.header("Ads")
+        # Placeholder for left ad
+        # For real ads, replace with your ad code
+        st.html("""
+        <div style="background-color: #f0f0f0; padding: 10px; text-align: center;">
+            <p>Finance Ad Placeholder</p>
+            <p>Mortgage Rates Starting at 3.5%</p>
+        </div>
         """)
 
-    # PayPal donation button at the bottom of the page
-    st.markdown("---")  # Add a separator line
-    st.markdown("### Support This Tool")
-    st.markdown("If you find this property profit calculator helpful, consider supporting the development and hosting costs:")
+    # Right ad column
+    with col3:
+        st.header("Ads")
+        # Placeholder for right ad
+        # For real ads, replace with your ad code
+        st.html("""
+        <div style="background-color: #f0f0f0; padding: 10px; text-align: center;">
+            <p>Finance Ad Placeholder</p>
+            <p>Get Your Mortgage Approved Today!</p>
+        </div>
+        """)
+
+    # Main content in center column
+    with col2:
+        col2.title("🏠 Property Profit Calculator")
+        col2.markdown("### Calculate month by month profit for your property investment")
+        col2.markdown("""
+        This tool helps you analyze the profitability of your property purchase by considering:
+        - Mortgage payments and amortization
+        - Property appreciation
+        - Rental income (if applicable)
+        - Various expenses and scenarios
+        """)
+
+        inputs = initialize_webpage()
+                                                                             
+
+        # Initialize session state for input validation
+        if "inputs_valid" not in st.session_state:
+            st.session_state.inputs_valid = False
+
+        # Validate inputs and update session state
+        st.session_state.inputs_valid = are_inputs_valid(inputs)
+
+        # Display a submit button
+        calculate_button = col2.button("Calculate Profit if Sold on Monthly Basis")
+
+        # Only call the calculation function if inputs are valid and the button is clicked
+        if calculate_button:
+            if st.session_state.inputs_valid:
+                col2.success("All inputs are valid. Performing calculations...")
+                generate_monthly_property_profit_spreadsheet(inputs)
+            else:
+                col2.error("Please fill out all required fields correctly before calculating.")
     
-    # PayPal donation form
-    paypal_html = """
-    <form action="https://www.paypal.com/donate" method="post" target="_top">
-    <input type="hidden" name="business" value="ZF94BFC7ZMLNG" />
-    <input type="hidden" name="no_recurring" value="0" />
-    <input type="hidden" name="item_name" value="Support this page to help pay for hosting fees." />
-    <input type="hidden" name="currency_code" value="CAD" />
-    <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
-    <img alt="" border="0" src="https://www.paypal.com/en_CA/i/scr/pixel.gif" width="1" height="1" />
-    </form>
-    """
+                         
+                      
+                                          
     
-    st.markdown(paypal_html, unsafe_allow_html=True)
-    st.markdown("*Thank you for your support!*")
+                                                               
+                       
+                                  
+                                                                          
+                                                         
+                                                                            
+        
+        # Information section
+        col2.markdown("---")
+        col2.subheader("ℹ️ About This Tool")
+                                                    
+        
+        with col2.expander("How Property Investment Analysis Works"):
+            col2.markdown("""
+            **Mortgage Calculations:**
+            - Uses standard amortization formula to calculate monthly payments
+            - Tracks principal vs interest payments over time
+            - Accounts for different down payment percentages and interest rates
+            
+            **Opportunity Cost Analysis:**
+            - Compares property investment to S&P 500 historical returns (0.57% monthly)
+            - Shows what your down payment could have earned in the stock market
+            - Helps evaluate true investment performance
+            
+            **Multiple Scenarios:**
+            - Primary residence vs rental property analysis
+            - Accounts for rental income, property management, and vacancy rates
+            - Includes assistance from family/partners and rent savings
+            """)
+        
+        with col2.expander("Key Financial Assumptions"):
+            col2.markdown("""
+            **Property Appreciation:**
+            - Annual appreciation rate is converted to monthly compounding
+            - Property taxes and condo fees increase annually at specified rates
+            - Rental income can increase annually to keep pace with market
+            
+            **Cost Considerations:**
+            - Includes land transfer tax, real estate agent fees, and capital gains tax
+            - Monthly maintenance budget and utility costs
+            - Property management fees for rental properties
+            - Opportunity cost of down payment investment
+            """)
+        
+        with col2.expander("Important Disclaimers"):
+            col2.markdown("""
+            **⚠️ Important Notes:**
+            - This tool provides estimates based on simplified calculations
+            - Actual property values and rental markets can be volatile
+            - Interest rates, taxes, and regulations may change over time
+            - Consider consulting with a financial advisor for personalized advice
+            - Property investment involves risks including market downturns and vacancy
+            - Results are for educational purposes and should not be considered financial advice
+            """)
+
+        # PayPal donation button at the bottom of the page
+        col2.markdown("---")  # Add a separator line
+        col2.markdown("### Support This Tool")
+        col2.markdown("If you find this property profit calculator helpful, consider supporting the development and hosting costs:")
+        
+        # PayPal donation form
+        paypal_html = """
+        <form action="https://www.paypal.com/donate" method="post" target="_top">
+        <input type="hidden" name="business" value="ZF94BFC7ZMLNG" />
+        <input type="hidden" name="no_recurring" value="0" />
+        <input type="hidden" name="item_name" value="Support this page to help pay for hosting fees." />
+        <input type="hidden" name="currency_code" value="CAD" />
+        <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+        <img alt="" border="0" src="https://www.paypal.com/en_CA/i/scr/pixel.gif" width="1" height="1" />
+        </form>
+        """
+        
+        col2.markdown(paypal_html, unsafe_allow_html=True)
+        col2.markdown("*Thank you for your support!*")
 
 if __name__ == '__main__':
     main()
