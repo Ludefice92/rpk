@@ -31,7 +31,6 @@ def initialize_webpage():
             - Tax considerations: is_taxed, tax_percentage, factor
     """
     inputs = {}
-    st.title("Property monthly profit calculator")
 
     # Collect numeric inputs using text boxes
     primary_residence = st.radio("Is this property going to be your primary residence?", ("Yes", "No"))
@@ -628,7 +627,24 @@ def main():
         - Prevents calculation execution with incomplete/invalid data
         - Guides users to correct input issues before proceeding
     """
-    st.set_page_config(page_title="Mortgage Calculator", layout="centered")
+    # Set page configuration
+    st.set_page_config(
+        page_title="Property Profit Calculator",
+        page_icon="🏠",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+
+    st.title("🏠 Property Profit Calculator")
+    st.markdown("### Calculate month by month profit for your property investment")
+    st.markdown("""
+    This tool helps you analyze the profitability of your property purchase by considering:
+    - Mortgage payments and amortization
+    - Property appreciation
+    - Rental income (if applicable)
+    - Various expenses and scenarios
+    """)
+    
     inputs = initialize_webpage()
 
     # Initialize session state for input validation
@@ -648,6 +664,36 @@ def main():
             generate_monthly_property_profit_spreadsheet(inputs)
         else:
             st.error("Please fill out all required fields correctly before calculating.")
+
+    # Information section
+    st.markdown("---")
+    st.subheader("ℹ️ About This Tool")
+    
+    with st.expander("How the Calculations Work"):
+        st.markdown("""
+        **Mortgage Amortization:**
+        - Uses standard amortization formula for monthly payments
+        - Tracks principal and interest portions each month
+        - Accounts for property appreciation and opportunity costs
+        
+        **Profit Scenarios:**
+        - Calculates multiple scenarios including rental income, help, and rent savings
+        - Includes taxes, maintenance, and other expenses
+        """)
+    
+    with st.expander("Important Assumptions"):
+        st.markdown("""
+        - S&P 500 return of 0.57% monthly for opportunity cost (based on 8% historical annual gain)
+        - Annual increases applied monthly where appropriate
+        """)
+    
+    with st.expander("Disclaimers"):
+        st.markdown("""
+        **⚠️ Important Notes:**
+        - This is for informational purposes only
+        - Actual results may vary based on market conditions
+        - Consult a financial advisor for personalized advice
+        """)
     
     # PayPal donation button at the bottom of the page
     st.markdown("---")  # Add a separator line
