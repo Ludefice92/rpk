@@ -1,156 +1,403 @@
-import os
+import streamlit as st
 import pandas as pd
-from django.http import HttpResponse
-from django.shortcuts import render
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
 
+#TODO: give this entire file a once over to make sure that the descriptions/comments make sense...made a ton of changes and didn't check
 
-def calculate_gis_cpp_earnings():
-    """
-    Calculates and generates comprehensive GIS (Guaranteed Income Supplement) vs CPP (Canada Pension Plan) earnings analysis.
+# Set page configuration
+st.set_page_config(
+    page_title="GIS and CPP Optimizer",
+    page_icon="💰",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+def validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly):
+    """Validate user inputs with reasonable limits"""
+    errors = []
     
-    This function performs detailed financial modeling to compare different CPP start age scenarios and their impact
-    on total retirement income when combined with GIS benefits. The analysis accounts for the complex interaction
-    between CPP and GIS, where higher CPP payments reduce GIS eligibility due to income testing.
+    # GIS monthly amount validation (reasonable range for Canadian GIS)
+    if gis_monthly < 0:
+        errors.append("GIS monthly amount cannot be negative")
+    elif gis_monthly > 3000:  # Maximum GIS is around $950 CAD as of 2024
+        errors.append("GIS monthly amount seems too high (max ~$950 CAD)")
     
-    Key Financial Modeling:
-        - CPP deferral bonus: 0.84% per month (0.7% + 0.14% enhancement) for delayed retirement
-        - GIS reduction: 50% clawback rate on CPP income above basic exemption
-        - Age eligibility: GIS available ages 65-70, CPP can start 60-70
-        - Multiple start age scenarios: 65, 66, 67, 68, 69, 70 years
-        
-    Calculations Include:
-        - Monthly and annual CPP payments with deferral adjustments
-        - GIS payment reductions based on CPP income levels
-        - Cumulative lifetime income projections to age 100
-        - Comparative analysis across different CPP start ages
-        
-    Returns:
-        str: Filename of the generated Excel spreadsheet containing all scenarios
-        
-    Excel Output:
-        - Separate worksheet for each CPP start age (65-70)
-        - Monthly breakdown from age 65 to 100
-        - Cumulative income tracking for long-term planning
-        - Formatted columns with auto-sizing for readability
-    """
-    life_expectancy_max = 100
-    cpp_start_ages = [65, 66, 67, 68, 69, 70]
-    output_file = "cpp_gis_comparison.xlsx"
-
-    with pd.ExcelWriter(output_file, engine="xlsxwriter") as writer:
-        for cpp_start in cpp_start_ages:
-            results = []
-
-            cumulative_gis_income = 0
-            cumulative_cpp_income = 0
-            cumulative_income = 0
-            cpp_deferral_rate = 0.0084
-            cpp_amount = 1311.51
-            gis_amount = 1086.88
-            start_age = 65
-
-            deferral_years = max(0, cpp_start - 65)
-            cpp_def_factor = 1 + cpp_deferral_rate * (deferral_years * 12)
-
-            for age in range(start_age, life_expectancy_max + 1):
-                if age < cpp_start:
-                    gis_adjusted = gis_amount
-                    cpp_income = 0
-                else:
-                    cpp_income = round(cpp_amount * cpp_def_factor, 2)
-                    gis_reduction = cpp_income * 0.5
-                    gis_adjusted = round(max(0, gis_amount - gis_reduction), 2)
-
-                if age < 65 or age >= 71: gis_adjusted = 0
-
-                annual_cpp = round(cpp_income * 12)
-                annual_gis = round(gis_adjusted * 12)
-                annual_income = round(annual_cpp + annual_gis, 2)
-
-                cumulative_gis_income += annual_gis
-                cumulative_cpp_income += annual_cpp
-                cumulative_income += annual_income
-
-                results.append([
-                    age, cpp_income, annual_cpp, gis_adjusted, annual_gis, annual_income,
-                    cumulative_gis_income, cumulative_cpp_income, cumulative_income
-                ])
-
-            df = pd.DataFrame(results, columns=[
-                "Age", "CPP_Income", "Annual_CPP", "GIS_Adjusted", "Annual_GIS",
-                "Annual_Income", "Cumulative_GIS_Income", "Cumulative_CPP_Income", "Cumulative_Income"
-            ])
-            df.to_excel(writer, sheet_name=f"CPP_Start_Age_{cpp_start}", index=False)
-
-            worksheet = writer.sheets[f"CPP_Start_Age_{cpp_start}"]
-            for i, col in enumerate(df.columns):
-                max_length = max(df[col].astype(str).map(len).max(), len(col)) + 2
-                worksheet.set_column(i, i, max_length)
-
-    return output_file
-
-
-def generate_report(request):
-    """
-    Django view function that handles HTTP requests to generate and download the GIS/CPP comparison Excel report.
+    # CPP monthly amount validation (maximum CPP is around $1300 CAD as of 2024)
+    if cpp_monthly < 0:
+        errors.append("CPP monthly amount cannot be negative")
+    elif cpp_monthly > 5000:
+        errors.append("CPP monthly amount seems too high (max ~$1300 CAD)")
     
-    This function serves as the web interface endpoint for generating the retirement income analysis spreadsheet.
-    It orchestrates the calculation process and returns the Excel file as a downloadable HTTP response.
-    The function implements proper file handling and HTTP response formatting for web delivery.
+    # Life expectancy validation (oldest verified human lived to 122, adding 5 years buffer)
+    if life_expectancy < 60:
+        errors.append("Life expectancy cannot be less than 60 (earliest CPP start age)")
+    elif life_expectancy > 130:
+        errors.append("Life expectancy cannot be more than 130 years")
+
+    # Other taxable income monthly amount validation (reasonable range for Canadian GIS)
+    if other_taxable_monthly < 0:
+        errors.append("Other taxable income can not be negative")
+    elif other_taxable_monthly > 20000:  # Maximum GIS is around $950 CAD as of 2024 #TODO: clean up comments in this function, also this variable needs a better max...should pick the number where you for sure aren't getting ANY GIS
+        errors.append("We will save you some time, if you make more than $20000 per month you won't need GIS or CPP, why are you here?")
     
-    Args:
-        request (HttpRequest): Django HTTP request object containing client request data
-        
-    Returns:
-        HttpResponse: HTTP response containing the Excel file as an attachment with proper headers:
-            - Content-Type: Excel MIME type for proper browser handling
-            - Content-Disposition: Attachment header to trigger download
-            - Binary file data: Complete Excel spreadsheet with all calculations
+    return errors
+
+def calculate_cpp_adjustment_factor(start_age):
+    """Calculate CPP adjustment factor based on start age"""
+    if start_age < 65:
+        # Early pension reduction: 0.6% per month before 65
+        months_early = (65 - start_age) * 12
+        reduction = months_early * 0.006
+        return 1 - reduction
+    elif start_age > 65:
+        # Delayed pension increase: 0.7% per month after 65
+        months_late = (start_age - 65) * 12
+        increase = months_late * 0.007
+        return 1 + increase
+    else:
+        return 1.0
+
+def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly):
+    """Calculate GIS reduction based on CPP and other taxable income amount"""
+    threshold = 5000  # amount you are allowed to make before clawbacks occur
+    total_annual_taxable_income = (adjusted_cpp_monthly + other_taxable_monthly) * 12
+    if total_annual_taxable_income > threshold:
+        reduction = (total_annual_taxable_income - threshold) * 0.5
+        print(f"GIS values:\nreduction: {reduction}\nmonthly CPP: {adjusted_cpp_monthly}\nother monthly: {other_taxable_monthly}\nthreshold: {threshold}")
+        return max(0, reduction)
+    return 0
+
+def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_monthly):
+    """Find optimal CPP start age to maximize total lifetime benefits"""
+    results = []
+
+    for start_age in range(60, 71):
+        cumulative_gis_income = 0
+        cumulative_cpp_income = 0
+        cumulative_other_income = 0
+        cumulative_income = 0
+        # Calculate adjusted CPP amount
+        adjustment_factor = calculate_cpp_adjustment_factor(start_age)
+        adjusted_cpp = cpp_base * adjustment_factor
+        gis_reduction = 0
+        for curAge in range(60, life_expectancy + 1):
+            adjusted_gis = gis_base
+            actual_cpp = adjusted_cpp
+            if curAge < start_age: actual_cpp = 0
+            # Calculate GIS reduction
+            if curAge < 65 or curAge >= 71: #TODO: the upper part of this range is simplified due to RRIF assumptions, this should not be assumed
+                adjusted_gis = 0
+            else:
+                gis_reduction = calculate_gis_reduction(actual_cpp, other_taxable_monthly)
+
+            annual_cpp = round(actual_cpp * 12, 2)
+            annual_gis = max(0,round((adjusted_gis * 12) - gis_reduction, 2))
+            print(f"annual GIS: {annual_gis} and annual CPP: {annual_cpp} for curAge: {curAge} and start age: {start_age}\n---------------------------------------\n")
+            annual_other = round(other_taxable_monthly * 12, 2)
+            annual_income = round(annual_cpp + annual_gis + annual_other, 2)
+
+            cumulative_gis_income += annual_gis
+            cumulative_cpp_income += annual_cpp
+            cumulative_other_income += annual_other
+            cumulative_income += annual_income
+            #TODO: I'm not properly accounting for the forced RRSP->RRIF income at 71 that should be a whole other category which affects GIS and total income
+            #TODO: there is self employment income to model as well, there is a different clawback rate
+        results.append({
+            'start_age': start_age,
+            'total_cpp': cumulative_cpp_income,
+            'total_gis': cumulative_gis_income,
+            'total_other_taxable_income': cumulative_other_income,
+            'total_lifetime_income': cumulative_income
+        })
+    
+    return pd.DataFrame(results)
+
+def create_visualization(df):
+    """Create visualizations for the optimization results"""
+    fig, ((ax1, ax2)) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # Plot 1: Lifetime Benefits by Start Age
+    ax1.plot(df['start_age'], df['total_lifetime_income'], marker='o', linewidth=2, markersize=8)
+    ax1.set_title('Total Income by CPP Start Age', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('CPP Start Age')
+    ax1.set_ylabel('Lifetime Income ($)')
+    ax1.grid(True, alpha=0.3)
+    ax1.ticklabel_format(style='plain', axis='y')
+    
+    # Highlight optimal age
+    optimal_idx = df['total_lifetime_income'].idxmax()
+    optimal_age = df.loc[optimal_idx, 'start_age']
+    optimal_benefit = df.loc[optimal_idx, 'total_lifetime_income']
+    ax1.scatter(optimal_age, optimal_benefit, color='red', s=100, zorder=5)
+    ax1.annotate(f'Optimal: Age {optimal_age}', 
+                xy=(optimal_age, optimal_benefit), 
+                xytext=(optimal_age+1, optimal_benefit),
+                arrowprops=dict(arrowstyle='->', color='red'))
+    
+    # Plot 2: Monthly Benefits Breakdown
+    ax2.plot(df['start_age'], df['total_cpp'], marker='s', label='CPP', linewidth=2)
+    ax2.plot(df['start_age'], df['total_gis'], marker='^', label='GIS', linewidth=2)
+    ax2.plot(df['start_age'], df['total_other_taxable_income'], marker='x', label='Other', linewidth=2)
+    ax2.plot(df['start_age'], df['total_lifetime_income'], marker='o', label='Total', linewidth=2)
+    ax2.set_title('Monthly Benefits by CPP Start Age', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('CPP Start Age')
+    ax2.set_ylabel('Monthly Benefits ($)')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    return fig
+
+def formatAndDisplayTable(display_df):
+    headers = display_df.columns.tolist()
+    rows = display_df.values.tolist()
+
+    # Generate HTML table manually
+    table_html = "<table><thead><tr>"
+    for header in headers:
+        table_html += f"<th>{header}</th>"
+    table_html += "</tr></thead><tbody>"
+
+    for row in rows:
+        table_html += "<tr>"
+        for item in row:
+            table_html += f"<td>{item}</td>"
+        table_html += "</tr>"
+
+    table_html += "</tbody></table>"
+
+    # Apply custom styling to make it look clean
+    st.markdown("""
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #666;
+            padding: 8px;
+            text-align: right;
+        }
+        th {
+            background-color: #333;
+            color: white;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Show the table
+    st.markdown(table_html, unsafe_allow_html=True)
+
+def main():
+    st.title("🏦 GIS and CPP Optimizer")
+    st.markdown("### Optimize your Canada Pension Plan (CPP) start age to maximize lifetime benefits")
+    
+    st.markdown("""
+    This tool helps you determine the optimal age to start receiving CPP benefits by considering:
+    - CPP adjustment factors (early/late pension)
+    - Guaranteed Income Supplement (GIS) interactions
+    - Your life expectancy
+    - Total lifetime benefit optimization
+    """)
+    
+    # Sidebar for inputs
+    st.sidebar.header("📊 Input Parameters")
+    
+    # Input fields
+    gis_monthly = st.sidebar.number_input(
+        "GIS Monthly Amount ($CAD)",
+        min_value=0.0,
+        max_value=3000.0,
+        value=1100.0,
+        step=10.0,
+        help="Your expected monthly Guaranteed Income Supplement amount"
+    )
+    
+    cpp_monthly = st.sidebar.number_input(
+        "CPP Monthly Amount at Age 65 ($CAD)",
+        min_value=0.0,
+        max_value=5000.0,
+        value=1400.0,
+        step=10.0,
+        help="Your expected monthly CPP amount if you start at age 65"
+    )
+
+    other_taxable_monthly = st.sidebar.number_input(
+        "Other monthly taxable income ($CAD)",
+        min_value=0,
+        max_value=20000,
+        value=0,
+        step=10,
+        help="How much you make from all taxable income sources per month, except for CPP/OAS/GIS"
+    )
+    
+    life_expectancy = st.sidebar.number_input(
+        "Life Expectancy (years)",
+        min_value=60,
+        max_value=130,
+        value=80,
+        step=1,
+        help="Your estimated life expectancy"
+    )
+    
+    # Validate inputs
+    validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly)
+    
+    if validation_errors:
+        st.error("Please fix the following input errors:")
+        for error in validation_errors:
+            st.error(f"• {error}")
+        return
+    
+    # Calculate optimization results
+    if st.sidebar.button("🔍 Optimize CPP Start Age", type="primary"):
+        with st.spinner("Calculating optimal CPP start age..."):
+            results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly)
             
-    Process Flow:
-        1. Calls calculate_gis_cpp_earnings() to generate the Excel file
-        2. Opens the generated file in binary read mode
-        3. Creates HTTP response with Excel content type
-        4. Sets download headers to prompt file save dialog
-        5. Returns complete response with file data
-        
-    Error Handling:
-        - File operations are handled within context managers for proper cleanup
-        - Django's HttpResponse handles HTTP protocol compliance
-    """
-    file_path = calculate_gis_cpp_earnings()
-
-    with open(file_path, "rb") as excel:
-        response = HttpResponse(excel.read(),
-                                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        response["Content-Disposition"] = f'attachment; filename="{file_path}"'
-        return response
-
-
-def index(request):
-    """
-    Django view function that renders the main application homepage with the report generation interface.
-    
-    This function serves as the entry point for the web application, displaying the user interface
-    that allows users to trigger the GIS/CPP earnings analysis. It renders an HTML template
-    containing the necessary UI elements (typically a button) to initiate the report generation.
-    
-    Args:
-        request (HttpRequest): Django HTTP request object from the client browser
-        
-    Returns:
-        HttpResponse: Rendered HTML page containing the application interface
-        
-    Template Requirements:
-        - The "index.html" template should contain:
-            * User-friendly interface elements
-            * Button or form to trigger report generation
-            * Clear instructions for users
-            * Proper styling and layout
+            # Find optimal age
+            optimal_idx = results_df['total_lifetime_income'].idxmax()
+            optimal_result = results_df.loc[optimal_idx]
             
-    Integration:
-        - This view works in conjunction with generate_report() view
-        - URL routing should map this function to the root application path
-        - Template should reference the generate_report URL for form submission
+            # Display results
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric(
+                    "🎯 Optimal CPP Start Age",
+                    f"{int(optimal_result['start_age'])} years",
+                    help="Age that maximizes total lifetime income"
+                )
+            
+            with col2:
+                st.metric(
+                    "💰 Maximum Total Lifetime Income",
+                    f"${optimal_result['total_lifetime_income']:,.0f}",
+                    help="Total income over your lifetime"
+                )
+            
+            #with col3:
+            #    st.metric(
+            #        "📅 Monthly Benefits at Optimal Age",
+            #        f"${optimal_result['total_monthly']:.0f}",
+            #        help="Combined CPP + GIS monthly amount"
+            #    )
+            
+            # Create and display visualizations
+            st.subheader("📈 Optimization Analysis")
+            fig = create_visualization(results_df)
+            st.pyplot(fig)
+            
+            # Display detailed results table
+            st.subheader("📋 Detailed Results")
+            
+            # Format the dataframe for display
+            display_df = results_df.copy()
+            
+            # Rename columns for display
+            display_df.columns = [
+                'Start Age', 'Lifetime CPP ($)', 'Lifetime GIS ($)',
+                'Lifetime Other Taxable Income ($)', 'Total Lifetime Income ($)'
+            ]
+
+            # Format values
+            display_df['Start Age'] = display_df['Start Age'].astype(int)
+
+            for col in display_df.columns:
+                if col != 'Start Age':
+                    display_df[col] = display_df[col].map(lambda x: f"{x:,.2f}")
+
+            formatAndDisplayTable(display_df)
+            
+            # Key insights
+            st.subheader("🔍 Key Insights")
+            
+            early_benefit = results_df.loc[results_df['start_age'] == 60, 'total_lifetime_income'].iloc[0]
+            late_benefit = results_df.loc[results_df['start_age'] == 70, 'total_lifetime_income'].iloc[0]
+            optimal_benefit = optimal_result['total_lifetime_income']
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.info(f"""
+                **Early vs Optimal:**
+                - Starting at 60: ${early_benefit:,.0f}
+                - Starting at {int(optimal_result['start_age'])}: ${optimal_benefit:,.0f}
+                - Difference: ${optimal_benefit - early_benefit:,.0f}
+                """)
+            
+            with col2:
+                st.info(f"""
+                **Late vs Optimal:**
+                - Starting at 70: ${late_benefit:,.0f}
+                - Starting at {int(optimal_result['start_age'])}: ${optimal_benefit:,.0f}
+                - Difference: ${optimal_benefit - late_benefit:,.0f}
+                """)
+            
+            # Download option
+            csv = results_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Results as CSV",
+                data=csv,
+                file_name=f"cpp_optimization_results_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+    
+    # Information section
+    st.markdown("---")
+    st.subheader("ℹ️ About This Tool")
+    
+    with st.expander("How CPP Adjustments Work"):
+        st.markdown("""
+        **Early Pension (Age 60-64):**
+        - CPP is reduced by 0.6% for each month before age 65
+        - Maximum reduction: 36% if you start at age 60
+        
+        **Standard Pension (Age 65):**
+        - No adjustment - you receive 100% of your calculated CPP
+        
+        **Late Pension (Age 66-70):**
+        - CPP is increased by 0.7% for each month after age 65
+        - Maximum increase: 42% if you start at age 70
+        """)
+    
+    with st.expander("GIS Interaction"):
+        st.markdown("""
+        **Guaranteed Income Supplement (GIS):**
+        - GIS is reduced based on other pension income
+        - Generally reduced by $1 for every $2 of CPP income above a threshold
+        - This interaction affects the optimal CPP start age
+        - Higher CPP payments may reduce GIS eligibility
+        """) #TODO: this is a wrong description of GIS, fix it
+    
+    with st.expander("Important Disclaimers"):
+        st.markdown("""
+        **⚠️ Important Notes:**
+        - This tool provides estimates based on simplified calculations
+        - Actual CPP and GIS amounts depend on many factors including contribution history
+        - GIS eligibility and amounts are subject to annual income testing
+        - Consult with a financial advisor for personalized advice
+        - Government benefit rules may change over time
+        """)
+
+    # PayPal donation button at the bottom
+    st.markdown("---")
+    st.markdown("### 💝 Support This Tool")
+    st.markdown("If you found this GIS and CPP optimizer helpful, consider supporting its development:")
+    
+    # PayPal donation button HTML
+    paypal_html = """
+    <form action="https://www.paypal.com/donate" method="post" target="_top">
+    <input type="hidden" name="hosted_button_id" value="YOUR_PAYPAL_BUTTON_ID" />
+    <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+    <img alt="" border="0" src="https://www.paypal.com/en_CA/i/scr/pixel.gif" width="1" height="1" />
+    </form>
     """
-    return render(request, "index.html")
+    
+    st.markdown(paypal_html, unsafe_allow_html=True)
+    st.markdown("*Your support helps maintain and improve this free tool for everyone!*")
+
+if __name__ == "__main__":
+    main()
