@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-def validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, rrif_monthly=0):
+def validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, oas_monthly, oas_delay_months, rrif_monthly=0):
     """
     Validates all user inputs to ensure they meet the required criteria for CPP and GIS optimization calculations.
     
@@ -73,9 +73,20 @@ def validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_mon
     # RRIF monthly amount validation
     if rrif_monthly < 0:
         errors.append("RRIF monthly amount cannot be negative")
-    elif rrif_monthly > 20000: #TODO: clean up comments in this function, also this variable needs a better max...should pick the number where you for sure aren't getting ANY GIS
+    elif rrif_monthly > 20000:
         errors.append("RRIF monthly amount seems too high (consider reasonable withdrawal limits)")
+
+    # OAS monthly amount validation (reasonable range for Canadian OAS)
+    if oas_monthly < 0:
+        errors.append("OAS monthly amount cannot be negative")
+    elif oas_monthly > 3000:
+        errors.append("OAS monthly amount is far too high (max $3000 CAD)")
     
+    # OAS delay months validation
+    if oas_delay_months < 0:
+        errors.append("OAS delay months cannot be negative")
+    elif oas_delay_months > 60:
+        errors.append("OAS delay can be at most 60 months (5 years)")    
     return errors
 
 def calculate_cpp_adjustment_factor(start_age):
@@ -121,6 +132,24 @@ def calculate_cpp_adjustment_factor(start_age):
     else:
         return 1.0
 
+def calculate_oas_adjustment_factor(delay_months):
+    """
+    Calculates the OAS adjustment factor based on the number of months delayed after age 65.
+    
+    This function implements the OAS deferral increase rules. OAS can be deferred up to age 70,
+    with a 0.6% increase per month deferred.
+    
+    Args:
+        delay_months (int): Number of months OAS is delayed (0-60)
+        
+    Returns:
+        float: Adjustment factor (1.0 + 0.006 per month delayed)
+        
+    Example:
+        calculate_oas_adjustment_factor(0) returns 1.0
+        calculate_oas_adjustment_factor(60) returns 1.36 (36% increase)
+    """
+    return 1 + (delay_months * 0.006)
 def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly, rrif_monthly=0):
     """
     Calculates the annual reduction in Guaranteed Income Supplement (GIS) based on other income sources.
@@ -157,7 +186,7 @@ def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly, rrif_mo
         return max(0, reduction)
     return 0
 
-def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_monthly, province, rrif_monthly=0):
+def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_monthly, province, , oas_monthly, oas_delay_months, rrif_monthly=0):
     """
     Determines the optimal CPP start age to maximize total lifetime income across all benefit sources.
     
@@ -208,6 +237,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
     for start_age in range(60, 71):
         cumulative_gis_income = 0
         cumulative_cpp_income = 0
+        cumulative_oas_income = 0
         cumulative_other_income = 0
         cumulative_rrif_income = 0
         cumulative_taxes = 0
@@ -215,15 +245,21 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
         # Calculate adjusted CPP amount
         adjustment_factor = calculate_cpp_adjustment_factor(start_age)
         adjusted_cpp = cpp_base * adjustment_factor
+        
+        # Calculate adjusted OAS amount
+        oas_adjustment_factor = calculate_oas_adjustment_factor(oas_delay_months)
+        adjusted_oas = oas_monthly * oas_adjustment_factor
+        oas_start_age = 65 + (oas_delay_months // 12)
+        
         for curAge in range(60, life_expectancy + 1):
             adjusted_gis = gis_base
             actual_cpp = adjusted_cpp
+            actual_oas = 0
             actual_rrif = 0
             gis_reduction = 0
             
             if curAge < start_age: actual_cpp = 0
-            
-            # RRIF starts at age 71 if enabled
+            if curAge >= oas_start_age: actual_oas = adjusted_oas
             if curAge >= 71: actual_rrif = rrif_monthly
             
             # Calculate GIS reduction
@@ -232,18 +268,24 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
             else:
                 gis_reduction = calculate_gis_reduction(actual_cpp, other_taxable_monthly, actual_rrif)
 
+            if oas_start_age == curAge and oas_delay_months % 12 != 0: #accounts for months delayed for oas
+                annual_oas = round(actual_oas * (oas_delay_months%12), 2)
+            else:
+                annual_oas = round(actual_oas * 12, 2)
+
             annual_cpp = round(actual_cpp * 12, 2)
             annual_gis = max(0, round((adjusted_gis * 12) - gis_reduction, 2))
             annual_other = round(other_taxable_monthly * 12, 2)
             annual_rrif = round(actual_rrif * 12, 2)
-            annual_income = round(annual_cpp + annual_gis + annual_other + annual_rrif, 2)
-            total_annual_taxable_income = (actual_cpp + other_taxable_monthly + actual_rrif) * 12
+            annual_income = round(annual_cpp + annual_oas + annual_gis + annual_other + annual_rrif, 2)
+            total_annual_taxable_income = (actual_cpp + actual_oas + other_taxable_monthly + actual_rrif) * 12
             taxes = calculate_total_taxes(province, total_annual_taxable_income)
 
-            print(f"annual GIS: {annual_gis}, annual CPP: {annual_cpp}, annual RRIF: {annual_rrif} for curAge: {curAge} and start age: {start_age}\n---------------------------------------\n")
+            print(f"annual GIS: {annual_gis}, annual CPP: {annual_cpp}, annual OAS: {annual_oas}, annual RRIF: {annual_rrif} for curAge: {curAge} and start age: {start_age}\n---------------------------------------\n")
 
             cumulative_gis_income += annual_gis
             cumulative_cpp_income += annual_cpp
+            cumulative_oas_income += annual_oas
             cumulative_other_income += annual_other
             cumulative_rrif_income += annual_rrif
             cumulative_taxes += taxes
@@ -252,6 +294,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
         results.append({
             'start_age': start_age,
             'total_cpp': cumulative_cpp_income,
+            'total_oas': cumulative_oas_income,
             'total_gis': cumulative_gis_income,
             'total_other_taxable_income': cumulative_other_income,
             'total_rrif_income': cumulative_rrif_income,
@@ -314,16 +357,17 @@ def create_visualization(df):
                 xytext=(optimal_age+1, optimal_benefit),
                 arrowprops=dict(arrowstyle='->', color='red'))
     
-    # Plot 2: Monthly Benefits Breakdown
+    # Plot 2: Annual Benefits Breakdown
     ax2.plot(df['start_age'], df['total_cpp'], marker='s', label='CPP', linewidth=2)
+    ax2.plot(df['start_age'], df['total_oas'], marker='*', label='OAS', linewidth=2)
     ax2.plot(df['start_age'], df['total_gis'], marker='^', label='GIS', linewidth=2)
     ax2.plot(df['start_age'], df['total_other_taxable_income'], marker='x', label='Other', linewidth=2)
     if 'total_rrif_income' in df.columns and df['total_rrif_income'].sum() > 0:
         ax2.plot(df['start_age'], df['total_rrif_income'], marker='d', label='RRIF', linewidth=2)
     ax2.plot(df['start_age'], df['total_lifetime_net_income'], marker='o', label='Total', linewidth=2)
-    ax2.set_title('Monthly Benefits by CPP Start Age', fontsize=14, fontweight='bold')
+    ax2.set_title('Annual Benefits by CPP Start Age', fontsize=14, fontweight='bold')
     ax2.set_xlabel('CPP Start Age')
-    ax2.set_ylabel('Monthly Benefits ($)')
+    ax2.set_ylabel('Annual Benefits ($)')
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
@@ -513,6 +557,23 @@ def main():
             help="Your expected monthly CPP amount if you start at age 65"
         )
 
+        oas_monthly = col2.number_input(
+            "OAS Monthly Amount at Age 65 ($CAD)",
+            min_value=0.0,
+            max_value=3000.0,
+            value=750.0,
+            step=10.0,
+            help="Your expected monthly OAS amount if you start at age 65"
+        )
+
+        oas_delay_months = col2.number_input(
+            "OAS Delay Months",
+            min_value=0,
+            max_value=60,
+            value=0,
+            step=1,
+            help="Number of months to delay OAS after age 65 (up to 60 months for 36% increase)"
+        )
         other_taxable_monthly = col2.number_input(
             "Other monthly taxable income ($CAD)",
             min_value=0,
@@ -552,7 +613,7 @@ def main():
         province = col2.selectbox("Select Province/Territory", provinces, index=6)  # Default to ON
         
         # Validate inputs
-        validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, rrif_monthly)
+        validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, oas_monthly, oas_delay_months, rrif_monthly)
         
         if validation_errors:
             col2.error("Please fix the following input errors:")
@@ -563,7 +624,7 @@ def main():
         # Calculate optimization results
         if col2.button("🔍 Optimize CPP Start Age", type="primary"):
             with st.spinner("Calculating optimal CPP start age..."):
-                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, province, rrif_monthly)
+                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, province, oas_monthly, oas_delay_months, rrif_monthly)
                 
                 # Find optimal age
                 optimal_idx = results_df['total_lifetime_net_income'].idxmax()
@@ -601,7 +662,7 @@ def main():
                 
                 # Rename columns for display
                 display_df.columns = [
-                    'Start Age', 'Lifetime CPP ($)', 'Lifetime GIS ($)', 'Lifetime Other Taxable Income ($)', 
+                    'Start Age', 'Lifetime CPP ($)', 'Lifetime OAS ($)', 'Lifetime GIS ($)', 'Lifetime Other Taxable Income ($)', 
                     'Lifetime RRIF Income ($)', 'Total Lifetime Gross Income ($)', 'Lifetime Taxes ($)', 'Total Lifetime Net Income ($)'
                 ]
                 
