@@ -627,6 +627,22 @@ def main():
         - Prevents calculation execution with incomplete/invalid data
         - Guides users to correct input issues before proceeding
     """
+    if 'accepted_terms' not in st.session_state:
+        st.session_state.accepted_terms = False
+
+    if not st.session_state.accepted_terms:
+        st.markdown("# Terms of Service")
+        st.markdown("""
+        **Disclaimer:** This tool is provided for informational purposes only and does not constitute financial advice. The calculations and outputs are based solely on the inputs provided by the user and may not account for all individual circumstances, changes in legislation, or other factors that could affect your financial situation.
+
+        To obtain personalized financial advice, please consult a qualified financial advisor or professional. The author of this tool makes no representations or warranties about the accuracy, completeness, or suitability of the information provided. The outputs do not necessarily represent the views of the tool's author.
+
+        By using this tool, you agree that the author is not liable for any decisions made based on the tool's output, and you assume all responsibility for any actions taken as a result of using this tool.
+        """)
+        if st.button("I Accept"):
+            st.session_state.accepted_terms = True
+            st.rerun()
+        return
     # Set page configuration
     st.set_page_config(
         page_title="Property Profit Calculator",

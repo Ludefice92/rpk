@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime                                                                    
+from datetime import datetime
 
 #TODO: give this entire file a once over to make sure that the descriptions/comments make sense...made a ton of changes and didn't check
 
@@ -213,11 +213,11 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
         # Calculate adjusted CPP amount
         adjustment_factor = calculate_cpp_adjustment_factor(start_age)
         adjusted_cpp = cpp_base * adjustment_factor
-        gis_reduction = 0
         for curAge in range(60, life_expectancy + 1):
             adjusted_gis = gis_base
             actual_cpp = adjusted_cpp
             actual_rrif = 0
+            gis_reduction = 0
             
             if curAge < start_age: actual_cpp = 0
             
@@ -434,6 +434,22 @@ def main():
         The function includes placeholder advertisement content that should be
         replaced with actual advertising partnerships for monetization.
     """
+    if 'accepted_terms' not in st.session_state:
+        st.session_state.accepted_terms = False
+
+    if not st.session_state.accepted_terms:
+        st.markdown("# Terms of Service")
+        st.markdown("""
+        **Disclaimer:** This tool is provided for informational purposes only and does not constitute financial advice. The calculations and outputs are based solely on the inputs provided by the user and may not account for all individual circumstances, changes in legislation, or other factors that could affect your financial situation.
+
+        To obtain personalized financial advice, please consult a qualified financial advisor or professional. The author of this tool makes no representations or warranties about the accuracy, completeness, or suitability of the information provided. The outputs do not necessarily represent the views of the tool's author.
+
+        By using this tool, you agree that the author is not liable for any decisions made based on the tool's output, and you assume all responsibility for any actions taken as a result of using this tool.
+        """)
+        if st.button("I Accept"):
+            st.session_state.accepted_terms = True
+            st.rerun()
+        return
     col1, col2, col3 = st.columns([1, 6, 1])
     
     with col1:
@@ -538,7 +554,7 @@ def main():
         # Calculate optimization results
         if col2.button("🔍 Optimize CPP Start Age", type="primary"):
             with st.spinner("Calculating optimal CPP start age..."):
-                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, rrif_monthly, include_rrif)
+                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, rrif_monthly)
                 
                 # Find optimal age
                 optimal_idx = results_df['total_lifetime_income'].idxmax()
@@ -558,13 +574,11 @@ def main():
                     f"${optimal_result['total_lifetime_income']:,.0f}",
                     help="Total income over your lifetime"
                 )
-                
                 #    st.metric(
                 #        "📅 Monthly Benefits at Optimal Age",
                 #        f"${optimal_result['total_monthly']:.0f}",
                 #        help="Combined CPP + GIS monthly amount"
                 #    )
-                
                 # Create and display visualizations
                 st.subheader("📈 Optimization Analysis")
                 fig = create_visualization(results_df)
@@ -577,18 +591,11 @@ def main():
                 display_df = results_df.copy()
                 
                 # Rename columns for display
-                column_names = [
+                display_df.columns = [
                     'Start Age', 'Lifetime CPP ($)', 'Lifetime GIS ($)',
-                    'Lifetime Other Taxable Income ($)'
+                    'Lifetime Other Taxable Income ($)', 'Lifetime RRIF Income ($)', 'Total Lifetime Income ($)'
                 ]
                 
-                if include_rrif:
-                    column_names.append('Lifetime RRIF Income ($)')
-                
-                column_names.append('Total Lifetime Income ($)')
-                
-                display_df.columns = column_names
-
                 # Format values
                 display_df['Start Age'] = display_df['Start Age'].astype(int)
 
@@ -597,8 +604,7 @@ def main():
                         display_df[col] = display_df[col].map(lambda x: f"{x:,.2f}")
 
                 formatAndDisplayTable(display_df)
-                
-                col1, col2 = st.columns(2)
+                #col1, col2 = st.columns(2) #REMOVE?
                 
                 # Download option
                 csv = results_df.to_csv(index=False)
