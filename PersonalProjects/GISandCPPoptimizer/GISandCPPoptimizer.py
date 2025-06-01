@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
+from taxes_by_prov_terr import calculate_total_taxes
 
 #TODO: give this entire file a once over to make sure that the descriptions/comments make sense...made a ton of changes and didn't check
 
@@ -156,7 +157,7 @@ def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly, rrif_mo
         return max(0, reduction)
     return 0
 
-def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_monthly, rrif_monthly=0):
+def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_monthly, province, rrif_monthly=0):
     """
     Determines the optimal CPP start age to maximize total lifetime income across all benefit sources.
     
@@ -209,6 +210,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
         cumulative_cpp_income = 0
         cumulative_other_income = 0
         cumulative_rrif_income = 0
+        cumulative_taxes = 0
         cumulative_income = 0
         # Calculate adjusted CPP amount
         adjustment_factor = calculate_cpp_adjustment_factor(start_age)
@@ -235,6 +237,8 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
             annual_other = round(other_taxable_monthly * 12, 2)
             annual_rrif = round(actual_rrif * 12, 2)
             annual_income = round(annual_cpp + annual_gis + annual_other + annual_rrif, 2)
+            total_annual_taxable_income = (actual_cpp + other_taxable_monthly + actual_rrif) * 12
+            taxes = calculate_total_taxes(province, total_annual_taxable_income)
 
             print(f"annual GIS: {annual_gis}, annual CPP: {annual_cpp}, annual RRIF: {annual_rrif} for curAge: {curAge} and start age: {start_age}\n---------------------------------------\n")
 
@@ -242,6 +246,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
             cumulative_cpp_income += annual_cpp
             cumulative_other_income += annual_other
             cumulative_rrif_income += annual_rrif
+            cumulative_taxes += taxes
             cumulative_income += annual_income
             
         results.append({
@@ -250,7 +255,9 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
             'total_gis': cumulative_gis_income,
             'total_other_taxable_income': cumulative_other_income,
             'total_rrif_income': cumulative_rrif_income,
-            'total_lifetime_income': cumulative_income
+            'total_lifetime_gross_income': cumulative_income,
+            'total_taxes': cumulative_taxes,
+            'total_lifetime_net_income': cumulative_income - cumulative_taxes
         })
     
     return pd.DataFrame(results)
@@ -290,17 +297,17 @@ def create_visualization(df):
     fig, ((ax1, ax2)) = plt.subplots(1, 2, figsize=(15, 6))
     
     # Plot 1: Lifetime Benefits by Start Age
-    ax1.plot(df['start_age'], df['total_lifetime_income'], marker='o', linewidth=2, markersize=8)
+    ax1.plot(df['start_age'], df['total_lifetime_net_income'], marker='o', linewidth=2, markersize=8)
     ax1.set_title('Total Income by CPP Start Age', fontsize=14, fontweight='bold')
     ax1.set_xlabel('CPP Start Age')
-    ax1.set_ylabel('Lifetime Income ($)')
+    ax1.set_ylabel('Lifetime Net Income ($)')
     ax1.grid(True, alpha=0.3)
     ax1.ticklabel_format(style='plain', axis='y')
     
     # Highlight optimal age
-    optimal_idx = df['total_lifetime_income'].idxmax()
+    optimal_idx = df['total_lifetime_net_income'].idxmax()
     optimal_age = df.loc[optimal_idx, 'start_age']
-    optimal_benefit = df.loc[optimal_idx, 'total_lifetime_income']
+    optimal_benefit = df.loc[optimal_idx, 'total_lifetime_net_income']
     ax1.scatter(optimal_age, optimal_benefit, color='red', s=100, zorder=5)
     ax1.annotate(f'Optimal: Age {optimal_age}', 
                 xy=(optimal_age, optimal_benefit), 
@@ -313,7 +320,7 @@ def create_visualization(df):
     ax2.plot(df['start_age'], df['total_other_taxable_income'], marker='x', label='Other', linewidth=2)
     if 'total_rrif_income' in df.columns and df['total_rrif_income'].sum() > 0:
         ax2.plot(df['start_age'], df['total_rrif_income'], marker='d', label='RRIF', linewidth=2)
-    ax2.plot(df['start_age'], df['total_lifetime_income'], marker='o', label='Total', linewidth=2)
+    ax2.plot(df['start_age'], df['total_lifetime_net_income'], marker='o', label='Total', linewidth=2)
     ax2.set_title('Monthly Benefits by CPP Start Age', fontsize=14, fontweight='bold')
     ax2.set_xlabel('CPP Start Age')
     ax2.set_ylabel('Monthly Benefits ($)')
@@ -541,6 +548,8 @@ def main():
             step=1,
             help="Your estimated life expectancy"
         )
+        provinces = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'ON', 'PE', 'QC', 'SK', 'NT', 'NU', 'YT']
+        province = col2.selectbox("Select Province/Territory", provinces, index=6)  # Default to ON
         
         # Validate inputs
         validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, rrif_monthly)
@@ -554,10 +563,10 @@ def main():
         # Calculate optimization results
         if col2.button("🔍 Optimize CPP Start Age", type="primary"):
             with st.spinner("Calculating optimal CPP start age..."):
-                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, rrif_monthly)
+                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, other_taxable_monthly, province, rrif_monthly)
                 
                 # Find optimal age
-                optimal_idx = results_df['total_lifetime_income'].idxmax()
+                optimal_idx = results_df['total_lifetime_net_income'].idxmax()
                 optimal_result = results_df.loc[optimal_idx]
                 
                 # Display results
@@ -570,8 +579,8 @@ def main():
                 )
                 
                 st.metric(
-                    "💰 Maximum Total Lifetime Income",
-                    f"${optimal_result['total_lifetime_income']:,.0f}",
+                    "💰 Maximum Total Lifetime Net Income",
+                    f"${optimal_result['total_lifetime_net_income']:,.0f}",
                     help="Total income over your lifetime"
                 )
                 #    st.metric(
@@ -592,8 +601,8 @@ def main():
                 
                 # Rename columns for display
                 display_df.columns = [
-                    'Start Age', 'Lifetime CPP ($)', 'Lifetime GIS ($)',
-                    'Lifetime Other Taxable Income ($)', 'Lifetime RRIF Income ($)', 'Total Lifetime Income ($)'
+                    'Start Age', 'Lifetime CPP ($)', 'Lifetime GIS ($)', 'Lifetime Other Taxable Income ($)', 
+                    'Lifetime RRIF Income ($)', 'Total Lifetime Gross Income ($)', 'Lifetime Taxes ($)', 'Total Lifetime Net Income ($)'
                 ]
                 
                 # Format values
