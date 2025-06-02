@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-def validate_inputs(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, oas_monthly, oas_delay_months, rrif_monthly=0):
+def validate_inputs(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, retirement_months_delay, oas_monthly, oas_delay_months, rrif_monthly=0):
     """
     Validates all user inputs to ensure they meet the required criteria for CPP and GIS optimization calculations.
     
@@ -83,6 +83,12 @@ def validate_inputs(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_ta
         errors.append("Retirement age cannot be more than 75")
     if retirement_age >= life_expectancy:
         errors.append("Retirement age must be less than life expectancy")
+        
+    # Retirement months delay validation
+    if retirement_months_delay < 0:
+        errors.append("Retirement months delay cannot be negative")
+    elif retirement_months_delay > 11:
+        errors.append("Retirement months delay cannot be more than 11 months")
     
     # RRIF monthly amount validation
     if rrif_monthly < 0:
@@ -397,6 +403,14 @@ def main():
             step=1,
             help="The age at which you plan to retire (60-75)"
         )
+        retirement_months_delay = col2.number_input(
+            "Months after birth month to retire",
+            min_value=0,
+            max_value=11,
+            value=0,
+            step=1,
+            help="How many months after your birth month will you retire? (0-11). For example, if you're born in January and want to retire in March of your retirement year, enter 2."
+        )
         
         # RRIF section
         include_rrif = col2.checkbox(
@@ -432,7 +446,7 @@ def main():
         birth_month = months.index(birth_month_str) + 1
         
         # Validate inputs
-        validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, oas_monthly, oas_delay_months, rrif_monthly)
+        validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, retirement_months_delay, oas_monthly, oas_delay_months, rrif_monthly)
         
         if validation_errors:
             col2.error("Please fix the following input errors:")
@@ -443,7 +457,7 @@ def main():
         # Calculate optimization results
         if col2.button("🔍 Optimize CPP Start Age", type="primary"):
             with st.spinner("Calculating optimal CPP start age..."):
-                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly)
+                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, retirement_months_delay, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly)
                 
                 # Find optimal age
                 optimal_idx = results_df['total_lifetime_net_income'].idxmax()
