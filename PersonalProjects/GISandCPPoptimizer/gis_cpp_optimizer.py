@@ -99,7 +99,7 @@ def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly, rrif_mo
         return max(0, reduction)
     return 0
 
-def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_monthly, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly=0):
+def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly=0):
     """
     Determines the optimal CPP start age to maximize total lifetime income across all benefit sources.
     
@@ -174,6 +174,8 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, other_taxable_mo
             if curAge < start_age: actual_cpp = 0
             if curAge >= oas_start_age: actual_oas = adjusted_oas
             if curAge >= 71: actual_rrif = rrif_monthly
+            
+            other_taxable_monthly = (pre_retirement_taxable_monthly if curAge < retirement_age else 0) + (post_retirement_taxable_monthly if curAge >= retirement_age else 0)
             
             # Calculate GIS reduction
             if curAge < 65:
