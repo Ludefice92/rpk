@@ -1,7 +1,7 @@
 import pandas as pd
 from taxes_by_prov_terr import calculate_total_taxes
 
-def calculate_cpp_adjustment_factor(start_age):
+def calculate_cpp_adjustment_factor(cpp_start_delay_months):
     """
     Calculates the CPP adjustment factor based on the age when CPP benefits are first claimed.
     
@@ -9,9 +9,9 @@ def calculate_cpp_adjustment_factor(start_age):
     the base CPP amount depending on when benefits are started. The Canadian government
     provides incentives for delaying CPP and penalties for taking it early to account for
     the different number of years benefits will be received.
-    
+    #TODO: update this functions comments and check others
     Args:
-        start_age (int): Age when CPP benefits will begin (must be between 60-70)
+        cpp_start_delay_months (int): Month when CPP benefits will begin (must be between 0-120)
         
     Returns:
         float: Adjustment factor to multiply against base CPP amount
@@ -31,14 +31,13 @@ def calculate_cpp_adjustment_factor(start_age):
         calculate_cpp_adjustment_factor(65) returns 1.0 (no adjustment)
         calculate_cpp_adjustment_factor(68) returns 1.252 (25.2% increase)
     """
-    if start_age < 65:
-        # Early pension reduction: 0.6% per month before 65
-        months_early = (65 - start_age) * 12
+    # Calculate adjustment factor
+    if cpp_start_delay_months < 60:
+        months_early = 60 - cpp_start_delay_months
         reduction = months_early * 0.006
         return 1 - reduction
-    elif start_age > 65:
-        # Delayed pension increase: 0.7% per month after 65
-        months_late = (start_age - 65) * 12
+    elif cpp_start_delay_months > 60:
+        months_late = cpp_start_delay_months - 60
         increase = months_late * 0.007
         return 1 + increase
     else:
@@ -101,29 +100,38 @@ def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly, rrif_mo
 
 def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, retirement_months_delay, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly=0):
     """
-    Determines the optimal CPP start age to maximize total lifetime income across all benefit sources.
+    Determines the optimal CPP start age and month to maximize total lifetime income across all benefit sources.
     
     This is the core optimization function that simulates lifetime income scenarios for each possible
-    CPP start age (60-70) and calculates the total cumulative income from all sources. The function
+    CPP start month (from age 60 to 70) and calculates the total cumulative income from all sources. The function
     models the complex interactions between CPP timing, GIS clawbacks, RRIF income, and other taxable
-    income to find the age that maximizes total lifetime benefits.
+    income to find the age and month that maximizes total lifetime benefits.
     
     The optimization considers:
-    - CPP adjustment factors for early/delayed start
+    - CPP adjustment factors for early/delayed start (calculated monthly)
     - GIS reduction based on total income
     - Age-based benefit eligibility (GIS starts at 65, RRIF at 71)
-    - Year-by-year income calculations from age 60 to life expectancy
+    - Month-by-month income calculations from age 60 to life expectancy
+    - CPP can start the month after birth month when turning 60 or later
     
     Args:
         gis_base (float): Base monthly GIS amount (before any reductions)
         cpp_base (float): Base monthly CPP amount at age 65 (before adjustments)
         life_expectancy (int): Expected life expectancy in years
-        other_taxable_monthly (float): Monthly taxable income from other sources
+        pre_retirement_taxable_monthly (float): Monthly taxable income before retirement
+        post_retirement_taxable_monthly (float): Monthly taxable income after retirement
+        retirement_age (int): Age at which retirement occurs
+        retirement_months_delay (int): Months after birth month to retire (0-11)
+        province (str): Province/territory code for tax calculations
+        oas_monthly (float): Base monthly OAS amount at age 65
+        oas_delay_months (int): Number of months to delay OAS after age 65
+        birth_month (int): Birth month (1-12)
         rrif_monthly (float, optional): Monthly RRIF income starting at age 71. Defaults to 0.
         
     Returns:
         pandas.DataFrame: Results dataframe with columns:
             - start_age: CPP start age (60-70)
+            - start_month: CPP start month (1-12, month after birth month)
             - total_cpp: Cumulative lifetime CPP income
             - total_gis: Cumulative lifetime GIS income (after reductions)
             - total_other_taxable_income: Cumulative lifetime other taxable income
@@ -131,7 +139,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             - total_lifetime_income: Sum of all income sources over lifetime
             
     Calculation Process:
-        1. For each possible CPP start age (60-70):
+        1. For each possible CPP start month from age 60 to 70:
            a. Calculate adjusted CPP amount using age-based factors
            b. For each year from 60 to life expectancy:
               - Determine active income sources based on current age
@@ -166,7 +174,19 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
     oas_adjustment_factor = calculate_oas_adjustment_factor(oas_delay_months)
     adjusted_oas = oas_monthly * oas_adjustment_factor
 
-    for start_age in range(60, 71):
+    for cpp_start_delay_months in range(1, 122):
+        # Calculate effective CPP start
+        delay_mod = cpp_start_delay_months % 12
+        full_years = cpp_start_delay_months // 12
+        start_calendar_month = ((birth_month - 1 + delay_mod) % 12) + 1
+        carry_over = 1 if (birth_month + delay_mod > 12) else 0
+        cpp_effective_age = 60 + full_years + carry_over
+        receiving_months_in_start_year = 12 - start_calendar_month + 1
+
+        # Calculate adjusted CPP amount
+        adjustment_factor = calculate_cpp_adjustment_factor(cpp_start_delay_months)
+        adjusted_cpp = cpp_base * adjustment_factor
+
         cumulative_gis_income = 0
         cumulative_cpp_income = 0
         cumulative_oas_income = 0
@@ -175,10 +195,6 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
         cumulative_taxes = 0
         cumulative_income = 0
         
-        # Calculate adjusted CPP amount
-        adjustment_factor = calculate_cpp_adjustment_factor(start_age)
-        adjusted_cpp = cpp_base * adjustment_factor
-        
         for curAge in range(60, life_expectancy + 1):
             adjusted_gis = gis_base
             actual_cpp = adjusted_cpp
@@ -186,7 +202,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             actual_rrif = 0
             gis_reduction = 0
             
-            if curAge < start_age: actual_cpp = 0
+            if curAge < cpp_effective_age: actual_cpp = 0
             if curAge >= oas_effective_age: actual_oas = adjusted_oas
             if curAge >= 71: actual_rrif = rrif_monthly
             
@@ -214,7 +230,16 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             else:
                 annual_oas = 0
 
-            annual_cpp = round(actual_cpp * 12, 2)
+            # For CPP
+            if curAge > cpp_effective_age:
+                actual_cpp = adjusted_cpp
+                annual_cpp = round(adjusted_cpp * 12, 2)
+            elif curAge == cpp_effective_age:
+                actual_cpp = adjusted_cpp * (receiving_months_in_start_year / 12.0)
+                annual_cpp = round(adjusted_cpp * receiving_months_in_start_year, 2)
+            else:
+                actual_cpp = 0
+                annual_cpp = 0
             annual_gis = max(0, round((adjusted_gis * 12) - gis_reduction, 2))
             annual_other = round(other_taxable_monthly * 12, 2)
             annual_rrif = round(actual_rrif * 12, 2)
@@ -222,7 +247,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             total_annual_taxable_income = (actual_cpp + actual_oas + other_taxable_monthly + actual_rrif) * 12
             taxes = calculate_total_taxes(province, total_annual_taxable_income)
 
-            print(f"annual GIS: {annual_gis}, annual CPP: {annual_cpp}, annual OAS: {annual_oas}, annual RRIF: {annual_rrif} for curAge: {curAge} and start age: {start_age}\n---------------------------------------\n")
+            print(f"annual GIS: {annual_gis}, annual CPP: {annual_cpp}, annual OAS: {annual_oas}, annual RRIF: {annual_rrif} for curAge: {curAge} and start age: {cpp_effective_age} and start month: {delay_mod}\n---------------------------------------\n")
 
             cumulative_gis_income += annual_gis
             cumulative_cpp_income += annual_cpp
@@ -233,7 +258,8 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             cumulative_income += annual_income
             
         results.append({
-            'start_age': start_age,
+            'start_age': cpp_effective_age,
+            'start_month': delay_mod,
             'total_cpp': cumulative_cpp_income,
             'total_oas': cumulative_oas_income,
             'total_gis': cumulative_gis_income,

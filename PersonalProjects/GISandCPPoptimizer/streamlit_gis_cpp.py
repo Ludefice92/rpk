@@ -143,9 +143,10 @@ def create_visualization(df):
         - Helps users understand how CPP timing affects each benefit type
     """
     fig, ((ax1, ax2)) = plt.subplots(1, 2, figsize=(15, 6))
-    
+    df['start_time'] = df['start_age'] + (df['start_month'] - 1) / 12.0
+                
     # Plot 1: Lifetime Benefits by Start Age
-    ax1.plot(df['start_age'], df['total_lifetime_net_income'], marker='o', linewidth=2, markersize=8)
+    ax1.plot(df['start_time'], df['total_lifetime_net_income'], marker='o', linewidth=2, markersize=8)
     ax1.set_title('Total Income by CPP Start Age', fontsize=14, fontweight='bold')
     ax1.set_xlabel('CPP Start Age')
     ax1.set_ylabel('Lifetime Net Income ($)')
@@ -154,29 +155,30 @@ def create_visualization(df):
     
     # Highlight optimal age
     optimal_idx = df['total_lifetime_net_income'].idxmax()
-    optimal_age = df.loc[optimal_idx, 'start_age']
+    optimal_start_time = df.loc[optimal_idx, 'start_time']
     optimal_benefit = df.loc[optimal_idx, 'total_lifetime_net_income']
-    ax1.scatter(optimal_age, optimal_benefit, color='red', s=100, zorder=5)
-    ax1.annotate(f'Optimal: Age {optimal_age}', 
-                xy=(optimal_age, optimal_benefit), 
-                xytext=(optimal_age+1, optimal_benefit),
+    ax1.scatter(optimal_start_time, optimal_benefit, color='red', s=100, zorder=5)
+    ax1.annotate(f'Optimal: Age {optimal_start_time}', 
+                xy=(optimal_start_time, optimal_benefit), 
+                xytext=(optimal_start_time+1, optimal_benefit),
                 arrowprops=dict(arrowstyle='->', color='red'))
     
-    # Plot 2: Annual Benefits Breakdown
-    ax2.plot(df['start_age'], df['total_cpp'], marker='s', label='CPP', linewidth=2)
-    ax2.plot(df['start_age'], df['total_oas'], marker='*', label='OAS', linewidth=2)
-    ax2.plot(df['start_age'], df['total_gis'], marker='^', label='GIS', linewidth=2)
-    ax2.plot(df['start_age'], df['total_other_taxable_income'], marker='x', label='Other', linewidth=2)
+    # Plot 2: Lifetime Benefits Breakdown
+    ax2.plot(df['start_time'], df['total_cpp'], marker='s', label='CPP', linewidth=2)
+    ax2.plot(df['start_time'], df['total_oas'], marker='*', label='OAS', linewidth=2)
+    ax2.plot(df['start_time'], df['total_gis'], marker='^', label='GIS', linewidth=2)
+    ax2.plot(df['start_time'], df['total_other_taxable_income'], marker='x', label='Other', linewidth=2)
     if 'total_rrif_income' in df.columns and df['total_rrif_income'].sum() > 0:
-        ax2.plot(df['start_age'], df['total_rrif_income'], marker='d', label='RRIF', linewidth=2)
-    ax2.plot(df['start_age'], df['total_lifetime_net_income'], marker='o', label='Total', linewidth=2)
-    ax2.set_title('Annual Benefits by CPP Start Age', fontsize=14, fontweight='bold')
+        ax2.plot(df['start_time'], df['total_rrif_income'], marker='d', label='RRIF', linewidth=2)
+    ax2.plot(df['start_time'], df['total_lifetime_net_income'], marker='o', label='Total', linewidth=2)
+    ax2.set_title('Lifetime Income by CPP Start Age', fontsize=14, fontweight='bold')
     ax2.set_xlabel('CPP Start Age')
-    ax2.set_ylabel('Annual Benefits ($)')
+    ax2.set_ylabel('Lifetime Income ($)')
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
     plt.tight_layout()
+    df.pop("start_time")
     return fig
 
 def formatAndDisplayTable(display_df):
@@ -459,7 +461,7 @@ def main():
             with st.spinner("Calculating optimal CPP start age..."):
                 results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, retirement_months_delay, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly)
                 
-                # Find optimal age
+                # Find optimal age and month
                 optimal_idx = results_df['total_lifetime_net_income'].idxmax()
                 optimal_result = results_df.loc[optimal_idx]
                 
@@ -468,8 +470,8 @@ def main():
                 
                 st.metric(
                     "🎯 Optimal CPP Start Age",
-                    f"{int(optimal_result['start_age'])} years",
-                    help="Age that maximizes total lifetime income"
+                    f"{int(optimal_result['start_age'])} years, {int(optimal_result['start_month'])} months",
+                    help="Age and month that maximizes total lifetime income"
                 )
                 
                 st.metric(
@@ -495,15 +497,16 @@ def main():
                 
                 # Rename columns for display
                 display_df.columns = [
-                    'Start Age', 'Lifetime CPP ($)', 'Lifetime OAS ($)', 'Lifetime GIS ($)', 'Lifetime Other Taxable Income ($)', 
+                    'Start Age', 'Start Month', 'Lifetime CPP ($)', 'Lifetime OAS ($)', 'Lifetime GIS ($)', 'Lifetime Other Taxable Income ($)', 
                     'Lifetime RRIF Income ($)', 'Total Lifetime Gross Income ($)', 'Lifetime Taxes ($)', 'Total Lifetime Net Income ($)'
                 ]
                 
                 # Format values
                 display_df['Start Age'] = display_df['Start Age'].astype(int)
+                display_df['Start Month'] = display_df['Start Month'].astype(int)
 
                 for col in display_df.columns:
-                    if col != 'Start Age':
+                    if col not in ['Start Age', 'Start Month']:
                         display_df[col] = display_df[col].map(lambda x: f"{x:,.2f}")
 
                 formatAndDisplayTable(display_df)
