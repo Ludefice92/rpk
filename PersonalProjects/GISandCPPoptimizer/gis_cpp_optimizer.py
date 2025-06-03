@@ -147,6 +147,25 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
     """
     results = []
 
+    # Calculate effective retirement age and proration
+    retirement_calendar_month = ((birth_month - 1 + retirement_months_delay) % 12) + 1
+    carry_over = 1 if (birth_month + retirement_months_delay > 12) else 0
+    effective_retirement_age = retirement_age + carry_over
+    pre_retirement_months_in_ret_year = retirement_calendar_month - 1
+    post_retirement_months_in_ret_year = 12 - pre_retirement_months_in_ret_year
+    
+    # Calculate effective OAS start
+    oas_delay_months_mod = oas_delay_months % 12
+    oas_full_years = oas_delay_months // 12
+    oas_calendar_month = ((birth_month - 1 + oas_delay_months_mod) % 12) + 1
+    oas_carry_over = 1 if (birth_month + oas_delay_months_mod > 12) else 0
+    oas_effective_age = 65 + oas_full_years + oas_carry_over
+    oas_receiving_months_in_start_year = 12 - oas_calendar_month + 1
+
+    # Calculate adjusted OAS amount
+    oas_adjustment_factor = calculate_oas_adjustment_factor(oas_delay_months)
+    adjusted_oas = oas_monthly * oas_adjustment_factor
+
     for start_age in range(60, 71):
         cumulative_gis_income = 0
         cumulative_cpp_income = 0
@@ -155,14 +174,10 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
         cumulative_rrif_income = 0
         cumulative_taxes = 0
         cumulative_income = 0
+        
         # Calculate adjusted CPP amount
         adjustment_factor = calculate_cpp_adjustment_factor(start_age)
         adjusted_cpp = cpp_base * adjustment_factor
-        
-        # Calculate adjusted OAS amount
-        oas_adjustment_factor = calculate_oas_adjustment_factor(oas_delay_months)
-        adjusted_oas = oas_monthly * oas_adjustment_factor
-        oas_start_age = 65 + (oas_delay_months // 12)
         
         for curAge in range(60, life_expectancy + 1):
             adjusted_gis = gis_base
@@ -172,26 +187,17 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             gis_reduction = 0
             
             if curAge < start_age: actual_cpp = 0
-            if curAge >= oas_start_age: actual_oas = adjusted_oas
+            if curAge >= oas_effective_age: actual_oas = adjusted_oas
             if curAge >= 71: actual_rrif = rrif_monthly
             
-            #TODO: need to update handling for retirement age when I convert to calendar years for tax purposes
-            # Calculate other taxable income accounting for partial retirement year
-            if curAge < retirement_age:
-                # Before retirement age - full pre-retirement income
+            # Calculate other taxable income accounting for effective retirement age
+            if curAge < effective_retirement_age:
                 other_taxable_monthly = pre_retirement_taxable_monthly
-            elif curAge == retirement_age:
-                # Retirement year - partial pre-retirement and partial post-retirement income
-                # retirement_months_delay represents months after birth month when retirement occurs
-                pre_retirement_months = retirement_months_delay
-                post_retirement_months = 12 - retirement_months_delay
-                
-                monthly_pre_retirement_income = (pre_retirement_taxable_monthly * pre_retirement_months) / 12
-                monthly_post_retirement_income = (post_retirement_taxable_monthly * post_retirement_months) / 12
-                
-                other_taxable_monthly = monthly_pre_retirement_income + monthly_post_retirement_income
+            elif curAge == effective_retirement_age:
+                monthly_pre = (pre_retirement_taxable_monthly * pre_retirement_months_in_ret_year) / 12
+                monthly_post = (post_retirement_taxable_monthly * post_retirement_months_in_ret_year) / 12
+                other_taxable_monthly = monthly_pre + monthly_post
             else:
-                # After retirement age - full post-retirement income
                 other_taxable_monthly = post_retirement_taxable_monthly
                 
             # Calculate GIS reduction
@@ -200,10 +206,13 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             else:
                 gis_reduction = calculate_gis_reduction(actual_cpp, other_taxable_monthly, actual_rrif)
 
-            if oas_start_age == curAge and oas_delay_months % 12 != 0: #accounts for months delayed for oas
-                annual_oas = round(actual_oas * (oas_delay_months%12), 2)
-            else:
+            # Calculate annual OAS based on effective start age
+            if curAge > oas_effective_age:
                 annual_oas = round(actual_oas * 12, 2)
+            elif curAge == oas_effective_age:
+                annual_oas = round(actual_oas * oas_receiving_months_in_start_year, 2)
+            else:
+                annual_oas = 0
 
             annual_cpp = round(actual_cpp * 12, 2)
             annual_gis = max(0, round((adjusted_gis * 12) - gis_reduction, 2))
