@@ -131,8 +131,7 @@ def create_visualization(df):
     Visualization Components:
         
         Left Panel - Total Lifetime Income Optimization:
-        - Line plot showing total lifetime income vs CPP start age
-        - Red scatter point and annotation highlighting the optimal age
+        - Bar chart showing total lifetime income lost for each CPP start age compared to the optimal CPP start age
         - Grid and professional formatting for easy interpretation
         - Y-axis formatted to show dollar amounts clearly
         
@@ -144,24 +143,20 @@ def create_visualization(df):
     """
     fig, ((ax1, ax2)) = plt.subplots(1, 2, figsize=(15, 6))
     df['start_time'] = df['start_age'] + (df['start_month'] - 1) / 12.0
-                
-    # Plot 1: Lifetime Benefits by Start Age
-    ax1.plot(df['start_time'], df['total_lifetime_net_income'], marker='o', linewidth=2, markersize=8)
-    ax1.set_title('Total Income by CPP Start Age', fontsize=14, fontweight='bold')
-    ax1.set_xlabel('CPP Start Age')
-    ax1.set_ylabel('Lifetime Net Income ($)')
-    ax1.grid(True, alpha=0.3)
-    ax1.ticklabel_format(style='plain', axis='y')
-    
-    # Highlight optimal age
+    # Calculate optimal
     optimal_idx = df['total_lifetime_net_income'].idxmax()
     optimal_start_time = df.loc[optimal_idx, 'start_time']
     optimal_benefit = df.loc[optimal_idx, 'total_lifetime_net_income']
-    ax1.scatter(optimal_start_time, optimal_benefit, color='red', s=100, zorder=5)
-    ax1.annotate(f'Optimal: Age {optimal_start_time}', 
-                xy=(optimal_start_time, optimal_benefit), 
-                xytext=(optimal_start_time+1, optimal_benefit),
-                arrowprops=dict(arrowstyle='->', color='red'))
+
+    # Calculate losses
+    df['loss'] = df['total_lifetime_net_income'] - optimal_benefit
+
+    # Plot 1: Lifetime Loss by CPP Start Age
+    ax1.bar(df['start_time'], df['loss'], width=0.2, color='blue')
+    ax1.set_title('Lifetime Loss Compared to Optimal CPP Start Age', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('CPP Start Age')
+    ax1.set_ylabel('Lifetime Loss ($)')
+    ax1.grid(True, alpha=0.3, axis='y')
     
     # Plot 2: Lifetime Benefits Breakdown
     ax2.plot(df['start_time'], df['total_cpp'], marker='s', label='CPP', linewidth=2)
@@ -179,6 +174,7 @@ def create_visualization(df):
     
     plt.tight_layout()
     df.pop("start_time")
+    df.pop("loss")
     return fig
 
 def formatAndDisplayTable(display_df):

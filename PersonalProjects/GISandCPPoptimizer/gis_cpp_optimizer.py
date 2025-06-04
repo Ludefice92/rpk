@@ -32,12 +32,12 @@ def calculate_cpp_adjustment_factor(cpp_start_delay_months):
         calculate_cpp_adjustment_factor(68) returns 1.252 (25.2% increase)
     """
     # Calculate adjustment factor
-    if cpp_start_delay_months < 60:
-        months_early = 60 - cpp_start_delay_months
+    if cpp_start_delay_months < 61:
+        months_early = 61 - cpp_start_delay_months
         reduction = months_early * 0.006
         return 1 - reduction
-    elif cpp_start_delay_months > 60:
-        months_late = cpp_start_delay_months - 60
+    elif cpp_start_delay_months > 61:
+        months_late = cpp_start_delay_months - 61
         increase = months_late * 0.007
         return 1 + increase
     else:
@@ -62,7 +62,7 @@ def calculate_oas_adjustment_factor(delay_months):
     """
     return 1 + (delay_months * 0.006)
 
-def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly, rrif_monthly=0):
+def calculate_gis_reduction(annual_cpp, annual_other_taxable, annual_rrif=0):
     """
     Calculates the annual reduction in Guaranteed Income Supplement (GIS) based on other income sources.
     
@@ -71,9 +71,9 @@ def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly, rrif_mo
     seniors, so it decreases as other income increases to target benefits to those most in need.
     
     Args:
-        adjusted_cpp_monthly (float): Monthly CPP amount after age-based adjustments
-        other_taxable_monthly (float): Monthly taxable income from employment, self-employment, etc.
-        rrif_monthly (float, optional): Monthly RRIF income starting at age 71. Defaults to 0.
+        annual_cpp (float): Annual CPP amount after age-based adjustments
+        annual_other_taxable (float): Annual taxable income from employment, self-employment, etc.
+        annual_rrif (float, optional): Annual RRIF income starting at age 71. Defaults to 0.
         
     Returns:
         float: Annual GIS reduction amount in CAD. Returns 0 if total income is below threshold.
@@ -92,14 +92,14 @@ def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly, rrif_mo
     """
     threshold1 = 5000
     threshold2 = 15000
-    total_annual_taxable_income = (adjusted_cpp_monthly + other_taxable_monthly + rrif_monthly) * 12
-    if total_annual_taxable_income <= threshold1:
+    total_annual_taxable_income_no_oas = annual_cpp + annual_other_taxable + annual_rrif
+    if total_annual_taxable_income_no_oas <= threshold1:
         reduction = 0
-    elif total_annual_taxable_income <= threshold2:
-        reduction = (total_annual_taxable_income - threshold1) * 0.5
+    elif total_annual_taxable_income_no_oas <= threshold2:
+        reduction = (total_annual_taxable_income_no_oas - threshold1) * 0.5
     else:
-        reduction = (threshold2 - threshold1) * 0.5 + total_annual_taxable_income - threshold2
-    print(f"GIS values:\nreduction: {reduction}\nmonthly CPP: {adjusted_cpp_monthly}\nother monthly: {other_taxable_monthly}\nRRIF monthly: {rrif_monthly}\nthreshold1: {threshold1}\nthreshold2: {threshold2}")
+        reduction = (threshold2 - threshold1) * 0.5 + total_annual_taxable_income_no_oas - threshold2
+    print(f"GIS values:\nreduction: {reduction}\nannual CPP: {annual_cpp}\nannual other: {annual_other_taxable}\nannual RRIF: {annual_rrif}\nthreshold1: {threshold1}\nthreshold2: {threshold2}")
     return max(0, reduction)
 
 def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, retirement_months_delay, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly=0):
@@ -220,12 +220,6 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             else:
                 other_taxable_monthly = post_retirement_taxable_monthly
                 
-            # Calculate GIS reduction
-            if curAge < 65:
-                adjusted_gis = 0
-            else:
-                gis_reduction = calculate_gis_reduction(actual_cpp, other_taxable_monthly, actual_rrif)
-
             # Calculate annual OAS based on effective start age
             if curAge > oas_effective_age:
                 annual_oas = round(actual_oas * 12, 2)
@@ -244,12 +238,22 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             else:
                 actual_cpp = 0
                 annual_cpp = 0
-            annual_gis = max(0, round((adjusted_gis * 12) - gis_reduction, 2))
+
             annual_other = round(other_taxable_monthly * 12, 2)
             annual_rrif = round(actual_rrif * 12, 2)
-            annual_income = round(annual_cpp + annual_oas + annual_gis + annual_other + annual_rrif, 2)
-            total_annual_taxable_income = (actual_cpp + actual_oas + other_taxable_monthly + actual_rrif) * 12
+
+            total_annual_taxable_income = annual_cpp + annual_oas + annual_other + annual_rrif
             taxes = calculate_total_taxes(province, total_annual_taxable_income)
+
+            # Calculate GIS reduction after taxes
+            if curAge < 65:
+                adjusted_gis = 0
+                gis_reduction = 0
+            else:
+                gis_reduction = calculate_gis_reduction(annual_cpp, annual_other, annual_rrif)
+
+            annual_gis = max(0, round((adjusted_gis * 12) - gis_reduction, 2))
+            annual_income = round(annual_cpp + annual_oas + annual_gis + annual_other + annual_rrif, 2)
 
             print(f"annual GIS: {annual_gis}, annual CPP: {annual_cpp}, annual OAS: {annual_oas}, annual RRIF: {annual_rrif} for curAge: {curAge} and start age: {cpp_effective_age} and start month: {delay_mod}\n---------------------------------------\n")
 
