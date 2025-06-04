@@ -80,23 +80,27 @@ def calculate_gis_reduction(adjusted_cpp_monthly, other_taxable_monthly, rrif_mo
         
     Implementation:
         - Income threshold: $5,000 annually before any GIS reduction
-        - Reduction rate: 50% of income above threshold (50 cents per dollar)
+        - Reduction rate: 50% of income between $5,000 and $15,000
+        - Reduction rate: 100% of income above $15,000
         - Includes: CPP, other taxable income, net self employment income, RRIF income
         - Excludes: OAS (Old Age Security) - not included in this calculation
         
     Note:
         Not yet implemented:
         - Different thresholds for single vs. married individuals
-        - Different reduction rates at different income levels?  #TODO: double check this
-        - Provincial supplements with their own rules  #TODO: is this a thing?
+        - Provincial supplements with their own rules
     """
-    threshold = 5000  # amount you are allowed to make before clawbacks occur
+    threshold1 = 5000
+    threshold2 = 15000
     total_annual_taxable_income = (adjusted_cpp_monthly + other_taxable_monthly + rrif_monthly) * 12
-    if total_annual_taxable_income > threshold:
-        reduction = (total_annual_taxable_income - threshold) * 0.5
-        print(f"GIS values:\nreduction: {reduction}\nmonthly CPP: {adjusted_cpp_monthly}\nother monthly: {other_taxable_monthly}\nRRIF monthly: {rrif_monthly}\nthreshold: {threshold}")
-        return max(0, reduction)
-    return 0
+    if total_annual_taxable_income <= threshold1:
+        reduction = 0
+    elif total_annual_taxable_income <= threshold2:
+        reduction = (total_annual_taxable_income - threshold1) * 0.5
+    else:
+        reduction = (threshold2 - threshold1) * 0.5 + total_annual_taxable_income - threshold2
+    print(f"GIS values:\nreduction: {reduction}\nmonthly CPP: {adjusted_cpp_monthly}\nother monthly: {other_taxable_monthly}\nRRIF monthly: {rrif_monthly}\nthreshold1: {threshold1}\nthreshold2: {threshold2}")
+    return max(0, reduction)
 
 def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, retirement_months_delay, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly=0):
     """
