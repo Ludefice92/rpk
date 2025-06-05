@@ -266,7 +266,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             cumulative_income += annual_income
             
         results.append({
-            'start_age': cpp_effective_age,
+            'start_age': cpp_effective_age - carry_over,
             'start_month': delay_mod,
             'total_cpp': cumulative_cpp_income,
             'total_oas': cumulative_oas_income,
