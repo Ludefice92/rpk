@@ -1,15 +1,11 @@
 #!/bin/env python3
 import streamlit as st
-import pandas as pd
-import warnings
-from io import BytesIO
-
-# Suppress all warnings, for now this is just to ignore a spam message from pandas to make the console output more readable
-warnings.simplefilter(action='ignore', category=FutureWarning)
+from propertyprofitdjangobackend import calculate_amortization_schedule, generate_monthly_property_profit_spreadsheet
 
 #TODO: add ad functionality
 #TODO: make a website for this instead of using localhost
 #TODO: update such that the output spreadsheet has the correct number of columns for every single type of situation (right now just printing 0s for columns that aren't relevant)
+#TODO: Convert this implementation from streamlit to django
 
 def initialize_webpage():
     """
@@ -124,7 +120,6 @@ def initialize_webpage():
 
     return inputs
 
-#TODO: when everything else is done, update this function to return false instead of setting a return_val to False and remove debug prints
 def are_inputs_valid(inputs):
     """
     Validates all user inputs to ensure they meet the required criteria for property profit calculations.
@@ -272,333 +267,6 @@ def are_inputs_valid(inputs):
     if return_val: print("Debug: All inputs are valid")
     return return_val
 
-def calculate_mortgage_payment(principal, annual_interest_rate, years):
-    """
-    Calculates the fixed monthly mortgage payment using the standard amortization formula.
-    
-    This function implements the standard mortgage payment calculation formula that determines
-    the fixed monthly payment amount required to fully amortize a loan over a specified period.
-    The calculation assumes equal monthly payments throughout the loan term.
-    
-    Args:
-        principal (float): The loan amount (house price minus down payment)
-        annual_interest_rate (float): Annual interest rate as a percentage (e.g., 5.5 for 5.5%)
-        years (int): Loan amortization period in years
-        
-    Returns:
-        float: Monthly mortgage payment amount rounded to 2 decimal places
-        
-    Formula:
-        M = P * [r(1+r)^n] / [(1+r)^n - 1]
-        Where:
-        - M = Monthly payment
-        - P = Principal loan amount
-        - r = Monthly interest rate (annual rate / 12 / 100)
-        - n = Total number of payments (years * 12)
-    """
-    monthly_interest_rate = annual_interest_rate / 12 / 100
-    number_of_payments = years * 12
-    monthly_payment = ((principal * monthly_interest_rate * (1 + monthly_interest_rate) ** number_of_payments) /
-                       ((1 + monthly_interest_rate) ** number_of_payments - 1))
-    return round(monthly_payment,2)
-
-def calculate_interest_payment(outstanding_balance, annual_interest_rate):
-    """
-    Calculates the interest portion of a monthly mortgage payment based on the current outstanding balance.
-    
-    This function determines how much of a monthly payment goes toward interest charges
-    based on the remaining loan balance. The interest is calculated as a simple monthly
-    interest charge on the outstanding principal.
-    
-    Args:
-        outstanding_balance (float): Current remaining loan balance
-        annual_interest_rate (float): Annual interest rate as a percentage
-        
-    Returns:
-        float: Monthly interest payment amount rounded to 2 decimal places
-        
-    Note:
-        The principal payment for the month would be: monthly_payment - interest_payment
-        This creates the amortization effect where early payments are mostly interest
-        and later payments are mostly principal.
-    """
-    monthly_interest_rate = annual_interest_rate / 12 / 100
-    interest_payment = outstanding_balance * monthly_interest_rate
-    return round(interest_payment,2)
-
-def calculate_amortization_schedule(inputs):
-    """
-    Calculates a comprehensive month-by-month amortization schedule with profit analysis for various scenarios.
-    
-    This is the core calculation function that simulates property ownership over the entire amortization period,
-    tracking mortgage payments, property appreciation, rental income, expenses, and multiple profit scenarios.
-    The function models complex real estate investment scenarios including:
-    - Primary residence vs rental property scenarios
-    - Opportunity cost of down payment (modeled as S&P 500 returns)
-    - Property appreciation and tax implications
-    - Various income sources (rental, assistance, rent savings)
-    - Multiple expense categories (taxes, maintenance, condo fees, utilities)
-    
-    Args:
-        inputs (dict): Validated user inputs containing all property and financial parameters
-        
-    Returns:
-        list: A list of tuples, each representing one month's financial data including:
-            - Month number, mortgage payment breakdown (principal/interest)
-            - Running totals for all expense and income categories
-            - Current property value and remaining mortgage balance
-            - Profit calculations for multiple scenarios (base, with help, with rental income, etc.)
-            
-    Key Financial Modeling:
-        - Uses 0.57% monthly S&P 500 return for opportunity cost calculation
-        - Converts annual rates to monthly equivalents for accurate compounding
-        - Tracks profitability breakeven points for different scenarios
-        - Handles both condo and non-condo properties with different column structures
-        - Calculates cash flow analysis for rental properties
-    """
-    down_payment_multiplier = inputs.get("down_payment_percentage")*0.01
-    opportunity_cost_base = inputs.get("house_price") * down_payment_multiplier
-    opportunity_cost = opportunity_cost_base #opportunity cost accounting for money lost by not investing the down payment in the S&P500
-    sp500_return = 1.0057 #assuming historical rate of 0.57% per month, using this to model opportunity cost lost from down payment
-    principal = inputs.get("house_price") * (1-down_payment_multiplier)
-    monthly_payment = calculate_mortgage_payment(principal, inputs.get("interest_rate"), inputs.get("amortization_period"))
-    outstanding_balance = principal
-    annual_property_tax_base = inputs.get("property_taxes")
-    annual_property_tax_increase = 1 + inputs.get("annual_property_tax_increase") * 0.01
-    land_transfer_tax = inputs.get("land_transfer_tax")
-    agent_fee_multiplier = 1 - (inputs.get("real_estate_agent_fee")*0.01)
-    current_house_value = inputs.get("house_price") #will increment based on appreciation rate monthly
-    appreciation_rate = (1+(inputs.get("appreciation_rate")*0.01))**(1/12) #converting user input to increment on a monthly equivalent basis
-
-    #condo specific
-    if inputs.get("is_condo") == "Yes":
-        condo_fee_annual_increase = 1 + inputs.get("condo_fee_annual_increase") * 0.01
-        condo_fee_base = inputs.get("condo_fees")
-    else:
-        condo_fee_annual_increase = 1
-        condo_fee_base = 0
-    #rent from old place before moving to new property
-    if inputs.get("moving_from_rent") == "Yes":
-        rent_increase_rate = 1 + inputs.get("annual_rent_increase") * 0.01
-        rent_base = inputs.get("current_rent") #updating this base value later as it changes every year
-    else:
-        rent_increase_rate = 1
-        rent_base = 0
-    #rental information for the new property if it is a non principal residence income property
-    if inputs.get("rental_income_expected") == "Yes":
-        rental_income_increase_rate = 1 + inputs.get("rental_income_annual_increase") * 0.01
-        rental_income_base = inputs.get("rental_income")
-        occupancy_rate = inputs.get("occupancy_rate") * 0.01
-        if inputs.get("are_utilities_paid_by_renter") == "Yes":
-            utilities_not_paid_by_occupant = 0
-        else:
-            utilities_not_paid_by_occupant = inputs.get("total_utilities_not_paid_by_occupant")
-    else:
-        rental_income_increase_rate = 1
-        rental_income_base = 0
-        occupancy_rate = 0
-        utilities_not_paid_by_occupant = 0
-    if inputs.get("is_property_managed") == "Yes":
-        property_management_fee_base = rental_income_base * inputs.get("property_management_fees") * 0.01
-    else:
-        property_management_fee_base = 0
-
-    if inputs["primary_residence"] == "Yes":
-        extra_monthly_expenses = inputs.get("utilities_difference")
-    else:
-        extra_monthly_expenses = 0
-
-    #used for profit calculation
-    total_interest_paid = 0
-    total_property_tax_paid = 0
-    total_extra_monthly_expenses_paid = 0
-    total_maintenance_fees_paid = 0
-    total_condo_fees_paid = 0
-    total_help = 0
-    total_rent_saved = rent_base
-    total_rental_income = rental_income_base
-    total_property_management_fees = property_management_fee_base
-    total_utilities_not_paid_by_renter = 0
-
-    #covering all possibilities for profitability given user inputs
-    is_profitable = False
-    is_profitable_saving_rent = False
-    is_profitable_with_help = False
-    is_profitable_saverent_help = False
-    is_profitable_renting = False
-    is_profitable_renting_help = False
-    is_cash_flowing = False
-
-    schedule = []
-    
-    for month in range(1, inputs.get("amortization_period") * 12 + 1):
-        if (month % 12) == 0: #increments costs which increase on an annual basis
-            rent_base *= rent_increase_rate
-            annual_property_tax_base *= annual_property_tax_increase
-            if inputs.get("rental_income_expected") == "Yes":
-                rental_income_base *= rental_income_increase_rate
-                if inputs.get("is_property_managed") == "Yes": property_management_fee_base = rental_income_base * inputs.get("property_management_fees") * 0.01
-            condo_fee_base *= condo_fee_annual_increase
-        if month != 1:
-            total_rent_saved += rent_base
-            total_rental_income += rental_income_base
-
-        opportunity_cost *= sp500_return
-        interest_payment = calculate_interest_payment(outstanding_balance, inputs.get("interest_rate"))
-        principal_payment = monthly_payment - interest_payment
-        outstanding_balance -= principal_payment
-        total_interest_paid += interest_payment
-        total_property_management_fees += property_management_fee_base
-        total_property_tax_paid += annual_property_tax_base/12 #converting annual property tax to monthly
-        total_extra_monthly_expenses_paid += extra_monthly_expenses
-        total_utilities_not_paid_by_renter += utilities_not_paid_by_occupant
-        total_maintenance_fees_paid += inputs.get("monthly_maintenance")
-        if inputs.get("help") == "Yes": total_help += inputs.get("monthly_help")
-        current_house_value *= appreciation_rate
-        if inputs.get("is_taxed") == "Yes":
-            capital_gain = current_house_value - inputs["house_price"]
-            capital_gains_tax = capital_gain * inputs["factor"] * (inputs["tax_percentage"] / 100)
-        else:
-            capital_gains_tax = 0
-        profit_if_sold = ((current_house_value * agent_fee_multiplier) - land_transfer_tax - total_interest_paid -
-                          opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid -
-                          total_maintenance_fees_paid - total_utilities_not_paid_by_renter - capital_gains_tax)
-        if inputs.get("is_condo") == "Yes":
-            total_condo_fees_paid += condo_fee_base
-            profit_if_sold -= total_condo_fees_paid
-        profit_if_sold_with_rent_saved = profit_if_sold + total_rent_saved
-        profit_if_sold_with_help = profit_if_sold + total_help
-        profit_if_sold_rentsaved_help = profit_if_sold + total_rent_saved + total_help
-        profit_if_sold_with_rental_income = profit_if_sold + (total_rental_income * occupancy_rate) - total_property_management_fees
-        profit_if_sold_rentalincome_help = profit_if_sold_with_rental_income + total_help
-        if outstanding_balance<0: outstanding_balance = 0 #due to rounding it can be negative at the end
-
-        #outputting month of profitability for each combination selling
-        if not is_profitable and profit_if_sold > 0:
-            is_profitable = True
-            st.write(f"With no help, rental income, or saving rent from moving, you are profitable after {month} months")
-        if inputs.get("moving_from_rent")=="Yes" and not is_profitable_saving_rent and profit_if_sold_with_rent_saved > 0:
-            is_profitable_saving_rent = True
-            st.write(f"With only saving ${inputs.get("current_rent"):.2f}/month from your previous rental, you are profitable after {month} months")
-        if inputs.get("help")=="Yes" and not is_profitable_with_help and profit_if_sold_with_help > 0:
-            is_profitable_with_help = True
-            st.write(f"With getting ${inputs.get("monthly_help"):.2f} in help/month, you are profitable after {month} months")
-        if inputs.get("moving_from_rent")=="Yes" and inputs.get("help")=="Yes" and not is_profitable_saverent_help and profit_if_sold_rentsaved_help > 0:
-            is_profitable_saverent_help = True
-            st.write(f"With saving ${inputs.get("current_rent"):.2f}/month from your previous rental and getting {inputs.get("monthly_help"):.2f} in help/month, you are profitable after {month} months")
-        if inputs.get("rental_income_expected")=="Yes" and not is_profitable_renting and profit_if_sold_with_rental_income > 0:
-            is_profitable_renting = True
-            st.write(f"With renting your new property at ${inputs.get("rental_income"):.2f}/month, you are profitable after {month} months")
-        if inputs.get("rental_income_expected")=="Yes" and inputs.get("help")=="Yes" and not is_profitable_renting_help and profit_if_sold_rentalincome_help > 0:
-            is_profitable_renting_help = True
-            st.write(f"With renting your new property at ${inputs.get("rental_income"):.2f}/month and getting {inputs.get("monthly_help"):.2f} of help/month, you are profitable after {month} months")
-
-        if inputs.get("is_condo") == "Yes":
-            schedule.append((month, monthly_payment, interest_payment, principal_payment, round(outstanding_balance,2),
-                             round((opportunity_cost-opportunity_cost_base),2), round(total_property_tax_paid,2),
-                             round(current_house_value,2), total_extra_monthly_expenses_paid, total_maintenance_fees_paid,
-                             round(total_condo_fees_paid,2), round(profit_if_sold,2), total_help, round(profit_if_sold_with_help,2),
-                             round(total_rent_saved,2), round(total_rental_income,2), round(profit_if_sold_with_rent_saved,2),
-                             round(profit_if_sold_rentsaved_help,2), round(profit_if_sold_with_rental_income,2),
-                             round(profit_if_sold_rentalincome_help,2)))
-        else:
-            schedule.append((month, monthly_payment, interest_payment, principal_payment, round(outstanding_balance,2),
-                             round((opportunity_cost-opportunity_cost_base),2), round(total_property_tax_paid,2),
-                             round(current_house_value,2), total_extra_monthly_expenses_paid, total_maintenance_fees_paid,
-                             round(profit_if_sold,2), total_help, round(profit_if_sold_with_help,2),
-                             round(total_rent_saved,2), round(total_rental_income,2), round(profit_if_sold_with_rent_saved,2),
-                             round(profit_if_sold_rentsaved_help,2), round(profit_if_sold_with_rental_income,2),
-                             round(profit_if_sold_rentalincome_help,2)))
-
-        # Calculate if the property is cash flowing (for rental properties)
-        if not is_cash_flowing and inputs.get("primary_residence") == "No" and inputs.get("rental_income_expected") == "Yes":
-            monthly_cash_flow = (rental_income_base * occupancy_rate) - monthly_payment - (annual_property_tax_base / 12) - inputs.get("monthly_maintenance") - condo_fee_base - property_management_fee_base - utilities_not_paid_by_occupant
-            if inputs.get("help") == "Yes":
-                monthly_cash_flow += inputs.get("monthly_help")
-            if monthly_cash_flow > 0:
-                is_cash_flowing = true
-                st.write(f"The property is cash flowing with an initial monthly cash flow of ${monthly_cash_flow:.2f} in month {month}")
-            elif month == inputs.get("amortization_period") * 12:
-                st.write(f"The property is not cash flowing, with an initial monthly loss of ${monthly_cash_flow:.2f}")
-
-    return schedule
-
-def generate_monthly_property_profit_spreadsheet(inputs):
-    """
-    Generates and provides a downloadable Excel spreadsheet containing the complete amortization schedule and profit analysis.
-    
-    This function creates a comprehensive Excel file with month-by-month financial projections for the property investment.
-    The spreadsheet includes all calculated values from the amortization schedule, formatted for easy analysis and
-    presentation. The function handles different column structures for condo vs non-condo properties and provides
-    automatic column width adjustment for optimal readability.
-    
-    Args:
-        inputs (dict): Validated user inputs containing all property and financial parameters
-        
-    Returns:
-        None: The function generates a Streamlit download button for the Excel file
-        
-    Excel File Contents:
-        - Monthly mortgage payment breakdown (principal/interest)
-        - Property value appreciation over time
-        - Cumulative costs (taxes, maintenance, fees, opportunity cost)
-        - Multiple profit scenarios (base, with help, with rental income, etc.)
-        - Properly formatted sheet names based on property parameters
-        - Auto-sized columns for optimal viewing
-        
-    File Naming:
-        Sheet name format: ${house_price}_{interest_rate}%_{amortization_period}years
-        Download filename: amortization_schedule.xlsx
-    """
-    house_value = inputs.get("house_price")
-    annual_interest_rate = inputs.get("interest_rate")
-    amortization_period = inputs.get("amortization_period")
-
-    to_download = BytesIO()
-
-    #ignore to_download warning
-    with pd.ExcelWriter(to_download, engine='xlsxwriter') as writer:
-        amortization_schedule = calculate_amortization_schedule(inputs)
-        if inputs.get("is_condo") == "Yes":
-            # Convert to DataFrame
-            df = pd.DataFrame(amortization_schedule,
-                              columns=['Month After Purchase', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
-                                       'Remaining Balance', 'Opportunity Cost', 'Property Tax', 'House Value',
-                                       'Expenses Compared to Last Home', 'Maintenance Fees', 'Condo Fees',
-                                       'Profit', 'Help', 'Profit with Help', 'Rent Saved', 'Rental Income',
-                                       'Profit if Saving Rent', 'Profit with Rent Saved&Help', 'Profit with Rental Income',
-                                       'Profit with Rental Income&Help'])
-        else:
-            # Convert to DataFrame
-            df = pd.DataFrame(amortization_schedule,
-                              columns=['Month After Purchase', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
-                                       'Remaining Balance', 'Opportunity Cost', 'Property Tax', 'House Value',
-                                       'Expenses Compared to Last Home', 'Maintenance Fees', 'Profit', 'Help',
-                                       'Profit with Help', 'Rent Saved', 'Rental Income', 'Profit if Saving Rent',
-                                       'Profit with Rent Saved&Help', 'Profit with Rental Income',
-                                       'Profit with Rental Income&Help'])
-        # Save to Excel
-        sheet_name = f'${house_value}_{annual_interest_rate}%_{amortization_period}years'
-        df.to_excel(writer, sheet_name, index=False)
-
-        # Access the worksheet object to set column width
-        worksheet = writer.sheets[sheet_name]
-        # Set column widths based on content
-        for idx, col in enumerate(df.columns):
-            max_len = max(df[col].astype(str).map(len).max(),  # Length of largest item
-                          len(col)) + 1 # Length of column name/header
-            worksheet.set_column(idx, idx, max_len)
-
-    # Adding button to download the generated spreadsheet
-    to_download.seek(0)
-    st.write("Click the button below to download the spreadsheet:")
-    st.download_button(
-        label="Download Spreadsheet",
-        data=to_download,
-        file_name="amortization_schedule.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
 def main():
     """
     Main application entry point that orchestrates the Streamlit web application flow.
@@ -704,7 +372,21 @@ def main():
         if calculate_button:
             if st.session_state.inputs_valid:
                 col2.success("All inputs are valid. Performing calculations...")
-                generate_monthly_property_profit_spreadsheet(inputs)
+                
+                # Get profitability messages and display them
+                _, profitability_messages = calculate_amortization_schedule(inputs)
+                for message in profitability_messages:
+                    col2.write(message)
+                
+                # Generate and provide download for spreadsheet
+                spreadsheet_data = generate_monthly_property_profit_spreadsheet(inputs)
+                col2.write("Click the button below to download the spreadsheet:")
+                col2.download_button(
+                    label="Download Spreadsheet",
+                    data=spreadsheet_data,
+                    file_name="amortization_schedule.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
             else:
                 col2.error("Please fill out all required fields correctly before calculating.")
     
