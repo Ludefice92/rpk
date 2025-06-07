@@ -34,88 +34,88 @@ def initialize_webpage():
         rental_income_expected = st.radio("Is there expected rental income?", ("Yes", "No"))
         inputs["rental_income_expected"] = rental_income_expected
         if rental_income_expected == "Yes":
-            rental_income = st.text_input("How much rental income is expected per month?", value="0")
+            rental_income = st.text_input("How much rental income is expected per month?", value="2000")
             inputs["rental_income"] = float(rental_income) if rental_income else 0.0
-            rental_income_annual_increase = st.text_input("How much will you increase the rent for your new property each year (in %)?", value="0")
+            rental_income_annual_increase = st.text_input("How much will you increase the rent for your new property each year (in %)?", value="2.5")
             inputs["rental_income_annual_increase"] = float(rental_income_annual_increase) if rental_income_annual_increase else 0.0
-            occupancy_rate = st.text_input("What is the occupancy rate of your new rental (in %, 95 is the max allowed)?", value="0")
+            occupancy_rate = st.text_input("What is the occupancy rate of your new rental (in %, 95 is the max allowed)?", value="90")
             inputs["occupancy_rate"] = float(occupancy_rate) if occupancy_rate else 0.0
             is_property_managed = st.radio("Are you going to pay someone to manage your property for you?", ("Yes", "No"))
             inputs["is_property_managed"] = is_property_managed
             if is_property_managed == "Yes":
-                property_management_fees = st.text_input("How much are you going to pay your property manager (as a % of your rental income, standard is 10)?", value="0")
+                property_management_fees = st.text_input("How much are you going to pay your property manager (as a % of your rental income, standard is 10)?", value="10")
                 inputs["property_management_fees"] = float(property_management_fees) if property_management_fees else 0.0
             are_utilities_paid_by_renter = st.radio("Are there utilities that your renter is not paying for?",("Yes", "No"))
             inputs["are_utilities_paid_by_renter"] = are_utilities_paid_by_renter
             if are_utilities_paid_by_renter == "Yes":
-                total_utilities_not_paid_by_occupant = st.text_input("How much are you paying in utilities per month that your renter is not responsible for?",value="0")
+                total_utilities_not_paid_by_occupant = st.text_input("How much are you paying in utilities per month that your renter is not responsible for?",value="100")
                 inputs["total_utilities_not_paid_by_occupant"] = float(total_utilities_not_paid_by_occupant) if total_utilities_not_paid_by_occupant else 0.0
     else:
         # Check if the user is moving from a rental property
-        moving_from_rent = st.radio("Are you moving from a property which you currently rent?", ("Yes", "No"))
+        moving_from_rent = st.radio("Are you moving from a property which you currently rent?", ("Yes", "No"), index=1)
         inputs["moving_from_rent"] = moving_from_rent
         if moving_from_rent == "Yes":
-            current_rent = st.text_input("What is the monthly rent paid?", value="0")
+            current_rent = st.text_input("What is the monthly rent paid?", value="2000")
             inputs["current_rent"] = float(current_rent) if current_rent else 0.0
-            annual_rent_increase = st.text_input("How much do you estimate your current rent will go up each year (in %)?", value="0")
+            annual_rent_increase = st.text_input("How much do you estimate your current rent will go up each year (in %)?", value="2.5")
             inputs["annual_rent_increase"] = float(annual_rent_increase) if annual_rent_increase else 0.0
         utilities_difference = st.text_input(
-            "How much more do you expect to pay in utilities compared to your current residence? (Negative value if less, 0 if same)",
+            "How much more do you expect to pay in utilities/month compared to your current residence? (Negative value if less, 0 if same)",
             value="0")
         inputs["utilities_difference"] = float(utilities_difference) if utilities_difference else 0.0
 
     # Check if the property is a condo
-    is_condo = st.radio("Is the property a condo?", ("Yes", "No"))
+    is_condo = st.radio("Is the property a condo?", ("Yes", "No"), index=1)
     inputs["is_condo"] = is_condo
     if is_condo == "Yes":
-        condo_fees = st.text_input("What are the monthly condo fees?", value="0")
+        condo_fees = st.text_input("What are the monthly condo fees?", value="400")
         inputs["condo_fees"] = float(condo_fees) if condo_fees else 0.0
-        condo_fee_annual_increase = st.text_input("How much do the condo fees increase each year (in %)?", value="0")
+        condo_fee_annual_increase = st.text_input("How much do the condo fees increase each year (in %)?", value="2")
         inputs["condo_fee_annual_increase"] = float(condo_fee_annual_increase) if condo_fee_annual_increase else 0.0
 
     # Check if user is getting help from someone monthly to pay for their mortgage
-    if_help = st.radio("Are you getting assistance from someone each month (renting a room, from parents, a partner, etc)?", ("Yes", "No"))
+    if_help = st.radio("Are you getting assistance from someone each month (renting a room, from parents, a partner, etc)?", ("Yes", "No"), index=1)
     inputs["help"] = if_help
     if if_help == "Yes":
-        monthly_help = st.text_input("How much are you getting each month?", value="0")
+        monthly_help = st.text_input("How much are you getting each month?", value="500")
         inputs["monthly_help"] = float(monthly_help) if monthly_help else 0.0
 
-    interest_rate = st.text_input("Interest rate of your loan (in %)", value="0")
+    interest_rate = st.text_input("Interest rate of your loan (in %)", value="5")
     inputs["interest_rate"] = float(interest_rate) if interest_rate else 0.0
 
-    house_price = st.text_input("House price", value="0")
+    house_price = st.text_input("House price", value="500000")
     inputs["house_price"] = float(house_price) if house_price else 0.0
 
-    down_payment_percentage = st.text_input("Down payment (as a % of house price)", value="0")
+    down_payment_percentage = st.text_input("Down payment (as a % of house price)", value="20")
     inputs["down_payment_percentage"] = float(down_payment_percentage) if down_payment_percentage else 0.0
 
-    appreciation_rate = st.text_input("Expected annual appreciation rate of your new property (in %)", value="0")
+    appreciation_rate = st.text_input("Expected annual appreciation rate of your new property (in %)", value="2")
     inputs["appreciation_rate"] = float(appreciation_rate) if appreciation_rate else 0.0
 
-    amortization_period = st.text_input("What is the amortization period (in years)?", value="0")
+    amortization_period = st.text_input("What is the amortization period (in years)?", value="25")
     inputs["amortization_period"] = int(amortization_period) if amortization_period else 0
 
-    property_taxes = st.text_input("What are the annual property taxes?", value="0")
+    property_taxes = st.text_input("What are the annual property taxes?", value="5000")
     inputs["property_taxes"] = float(property_taxes) if property_taxes else 0.0
 
-    annual_property_tax_increase = st.text_input("How much do you estimate your property tax will go up each year (in %)?", value="0")
+    annual_property_tax_increase = st.text_input("How much do you estimate your property tax will go up each year (in %)?", value="2")
     inputs["annual_property_tax_increase"] = float(annual_property_tax_increase) if annual_property_tax_increase else 0.0
 
-    real_estate_agent_fee = st.text_input("What is your real estate agent fee when you sell (in %)?", value="0")
+    real_estate_agent_fee = st.text_input("What is your real estate agent fee when you sell (in %)?", value="5.5")
     inputs["real_estate_agent_fee"] = float(real_estate_agent_fee) if real_estate_agent_fee else 0.0
 
-    land_transfer_tax = st.text_input("What is the land transfer tax when you buy your new property?", value="0")
+    land_transfer_tax = st.text_input("What is the land transfer tax when you buy your new property?", value="8000")
     inputs["land_transfer_tax"] = float(land_transfer_tax) if land_transfer_tax else 0.0
 
-    maintenance_budget = st.text_input("What is your expected monthly maintenance fee budget?", value="0")
+    maintenance_budget = st.text_input("What is your expected monthly maintenance fee budget?", value="300")
     inputs["monthly_maintenance"] = float(maintenance_budget) if maintenance_budget else 0.0
 
-    is_taxed = st.radio("Will there be a tax on the sale of the property?", ("Yes", "No"))
+    is_taxed = st.radio("Will there be a tax on the sale of the property?", ("Yes", "No"), index=1)
     inputs["is_taxed"] = is_taxed
     if is_taxed == "Yes":
-        tax_percentage = st.text_input("What is the tax percentage on the capital gain?", value="0")
+        tax_percentage = st.text_input("What is the tax percentage on the capital gain?", value="35")
         inputs["tax_percentage"] = float(tax_percentage) if tax_percentage else 0.0
-        factor = st.text_input("What is the factor at which the capital gain is taxed (e.g., 0.5 for 50% taxable)?", value="0")
+        factor = st.text_input("What is the factor at which the capital gain is taxed (e.g., 0.5 for 50% taxable)?", value="1")
         inputs["factor"] = float(factor) if factor else 0.0
 
     return inputs
@@ -246,8 +246,9 @@ def are_inputs_valid(inputs):
             print("Debug: Missing annual rent increase, or not above 0 or less than or equal to 5000")
             return_val = False
         if not inputs.get("utilities_difference") or (inputs.get("utilities_difference") < -2500 or inputs.get("utilities_difference") > 2500):
-            print("Debug: Missing utilities difference, or between -2500 and 2500")
-            return_val = False
+            if inputs.get("utilities_difference") != 0:
+                print("Debug: Missing utilities difference, or between -2500 and 2500")
+                return_val = False
 
     # Check if there is help from family, partner, etc
     if inputs.get("help") == "Yes":
