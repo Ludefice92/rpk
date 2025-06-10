@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from datetime import datetime
 from gis_cpp_optimizer import calculate_cpp_adjustment_factor, calculate_oas_adjustment_factor, calculate_gis_reduction, optimize_cpp_start_age
 
@@ -141,7 +142,7 @@ def create_visualization(df):
         - Legend to distinguish between different income sources
         - Helps users understand how CPP timing affects each benefit type
     """
-    fig, ((ax1, ax2)) = plt.subplots(1, 2, figsize=(15, 6))
+    fig, ((ax1, ax2)) = plt.subplots(2, 1, figsize=(18, 10))
     df['start_time'] = df['start_age'] + (df['start_month'] - 1) / 12.0
     # Calculate optimal
     optimal_idx = df['total_lifetime_net_income'].idxmax()
@@ -172,6 +173,8 @@ def create_visualization(df):
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
+    ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+
     plt.tight_layout()
     df.pop("start_time")
     df.pop("loss")
@@ -374,13 +377,13 @@ def main():
             max_value=60,
             value=0,
             step=1,
-            help="Number of months to delay OAS after age 65 (up to 60 months for 36% increase)"
+            help="Number of months to delay OAS after age 65 (up to 60 months for 36% increase, this also delays your GIS)"
         )
         pre_retirement_taxable_monthly = col2.number_input(
-            "Pre-retirement monthly taxable income ($CAD)",
+            "Pre-retirement gross monthly taxable income ($CAD)",
             min_value=0,
             max_value=20000,
-            value=0,
+            value=6000,
             step=10,
             help="How much you make from all taxable income sources per month before retirement, including net self-employment income and RRSP withdrawals, except for CPP/OAS/GIS and forced RRIF withdrawals"
         )
