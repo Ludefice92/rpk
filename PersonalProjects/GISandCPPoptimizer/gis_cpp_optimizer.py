@@ -205,9 +205,8 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             actual_rrif = 0
             gis_reduction = 0
             
-            if curAge < cpp_effective_age: actual_cpp = 0
             if curAge >= oas_effective_age: actual_oas = adjusted_oas
-            if curAge >= 71: actual_rrif = rrif_monthly
+            if curAge > 71: actual_rrif = rrif_monthly
             
             # Calculate other taxable income accounting for effective retirement age
             if curAge < effective_retirement_age:

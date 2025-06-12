@@ -38,7 +38,7 @@ def calculate_federal_taxes(income):
     # Federal tax brackets for 2025
     federal_brackets = [
         (16129, 0),           # not taxed on first $16129
-        (57375, 0.15),        # 15% on first $57375
+        (57375, 0.14),        # 14% on first $57375
         (114750, 0.205),      # 20.5% from $57375 to $114750
         (177882, 0.26),       # 26% from $114750 to $177882
         (253414, 0.29),       # 29% from $177882 to $253414
