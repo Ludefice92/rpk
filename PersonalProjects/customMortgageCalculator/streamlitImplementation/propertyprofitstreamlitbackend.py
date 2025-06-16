@@ -229,21 +229,58 @@ def calculate_amortization_schedule(inputs):
             profitability_messages.append(f"With renting your new property at ${inputs.get('rental_income'):.2f}/month and getting {inputs.get('monthly_help'):.2f} of help/month, you are profitable after {month} months")
 
         if inputs.get("is_condo") == "Yes":
-            schedule.append((month, monthly_payment, interest_payment, principal_payment, round(outstanding_balance,2),
-                             round((opportunity_cost-opportunity_cost_base),2), round(total_property_tax_paid,2),
-                             round(current_house_value,2), total_extra_monthly_expenses_paid, total_maintenance_fees_paid,
-                             round(total_condo_fees_paid,2), round(profit_if_sold,2), total_help, round(profit_if_sold_with_help,2),
-                             round(total_rent_saved,2), round(total_rental_income,2), round(profit_if_sold_with_rent_saved,2),
-                             round(profit_if_sold_rentsaved_help,2), round(profit_if_sold_with_rental_income,2),
-                             round(profit_if_sold_rentalincome_help,2)))
+            row = {
+                'month': month,
+                'monthly_payment': monthly_payment,
+                'interest_payment': interest_payment,
+                'principal_payment': principal_payment,
+                'outstanding_balance': outstanding_balance,
+                'opportunity_cost_gain': opportunity_cost - opportunity_cost_base,
+                'total_property_tax_paid': total_property_tax_paid,
+                'current_house_value': current_house_value,
+                'total_extra_monthly_expenses_paid': total_extra_monthly_expenses_paid,
+                'total_maintenance_fees_paid': total_maintenance_fees_paid,
+                'total_condo_fees_paid': total_condo_fees_paid,
+                'profit_if_sold': profit_if_sold,
+                'total_help': total_help,
+                'profit_if_sold_with_help': profit_if_sold_with_help,
+                'total_rent_saved': total_rent_saved,
+                'total_rental_income': total_rental_income,
+                'profit_if_sold_with_rent_saved': profit_if_sold_with_rent_saved,
+                'profit_if_sold_rentsaved_help': profit_if_sold_rentsaved_help,
+                'profit_if_sold_with_rental_income': profit_if_sold_with_rental_income,
+                'profit_if_sold_rentalincome_help': profit_if_sold_rentalincome_help
+            }
         else:
-            schedule.append((month, monthly_payment, interest_payment, principal_payment, round(outstanding_balance,2),
-                             round((opportunity_cost-opportunity_cost_base),2), round(total_property_tax_paid,2),
-                             round(current_house_value,2), total_extra_monthly_expenses_paid, total_maintenance_fees_paid,
-                             round(profit_if_sold,2), total_help, round(profit_if_sold_with_help,2),
-                             round(total_rent_saved,2), round(total_rental_income,2), round(profit_if_sold_with_rent_saved,2),
-                             round(profit_if_sold_rentsaved_help,2), round(profit_if_sold_with_rental_income,2),
-                             round(profit_if_sold_rentalincome_help,2)))
+            row = {
+                'month': month,
+                'monthly_payment': monthly_payment,
+                'interest_payment': interest_payment,
+                'principal_payment': principal_payment,
+                'outstanding_balance': outstanding_balance,
+                'opportunity_cost_gain': opportunity_cost - opportunity_cost_base,
+                'total_property_tax_paid': total_property_tax_paid,
+                'current_house_value': current_house_value,
+                'total_extra_monthly_expenses_paid': total_extra_monthly_expenses_paid,
+                'total_maintenance_fees_paid': total_maintenance_fees_paid,
+                'profit_if_sold': profit_if_sold,
+                'total_help': total_help,
+                'profit_if_sold_with_help': profit_if_sold_with_help,
+                'total_rent_saved': total_rent_saved,
+                'total_rental_income': total_rental_income,
+                'profit_if_sold_with_rent_saved': profit_if_sold_with_rent_saved,
+                'profit_if_sold_rentsaved_help': profit_if_sold_rentsaved_help,
+                'profit_if_sold_with_rental_income': profit_if_sold_with_rental_income,
+                'profit_if_sold_rentalincome_help': profit_if_sold_rentalincome_help
+            }
+
+        # Round all numeric values in one step
+        row = {
+            key: round(value, 2) if isinstance(value, (int, float)) else value
+            for key, value in row.items()
+        }
+
+        schedule.append(row)
 
         # Calculate if the property is cash flowing (for rental properties)
         if not is_cash_flowing and inputs.get("primary_residence") == "No" and inputs.get("rental_income_expected") == "Yes":
@@ -256,7 +293,7 @@ def calculate_amortization_schedule(inputs):
             elif month == inputs.get("amortization_period") * 12:
                 profitability_messages.append(f"The property is not cash flowing, with an initial monthly loss of ${-monthly_cash_flow:.2f}")
 
-    return schedule, profitability_messages
+    return pd.DataFrame(schedule), profitability_messages
 
 def generate_monthly_property_profit_spreadsheet(inputs):
     """
@@ -295,32 +332,28 @@ def generate_monthly_property_profit_spreadsheet(inputs):
     with pd.ExcelWriter(to_download, engine='xlsxwriter') as writer:
         amortization_schedule, _ = calculate_amortization_schedule(inputs)
         if inputs.get("is_condo") == "Yes":
-            # Convert to DataFrame
-            df = pd.DataFrame(amortization_schedule,
-                              columns=['Month After Purchase', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
-                                       'Remaining Balance', 'Opportunity Cost', 'Property Tax', 'House Value',
-                                       'Expenses Compared to Last Home', 'Maintenance Fees', 'Condo Fees',
-                                       'Profit', 'Help', 'Profit with Help', 'Rent Saved', 'Rental Income',
-                                       'Profit if Saving Rent', 'Profit with Rent Saved&Help', 'Profit with Rental Income',
-                                       'Profit with Rental Income&Help'])
+            amortization_schedule.columns = ['Month After Purchase', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
+                    'Remaining Balance', 'Opportunity Cost', 'Property Tax', 'House Value',
+                    'Expenses Compared to Last Home', 'Maintenance Fees', 'Condo Fees',
+                    'Profit', 'Help', 'Profit with Help', 'Rent Saved', 'Rental Income',
+                    'Profit if Saving Rent', 'Profit with Rent Saved&Help', 'Profit with Rental Income',
+                    'Profit with Rental Income&Help']
         else:
-            # Convert to DataFrame
-            df = pd.DataFrame(amortization_schedule,
-                              columns=['Month After Purchase', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
-                                       'Remaining Balance', 'Opportunity Cost', 'Property Tax', 'House Value',
-                                       'Expenses Compared to Last Home', 'Maintenance Fees', 'Profit', 'Help',
-                                       'Profit with Help', 'Rent Saved', 'Rental Income', 'Profit if Saving Rent',
-                                       'Profit with Rent Saved&Help', 'Profit with Rental Income',
-                                       'Profit with Rental Income&Help'])
+            amortization_schedule.columns=['Month After Purchase', 'Monthly Payment', 'Interest Payment', 'Principal Payment',
+                    'Remaining Balance', 'Opportunity Cost', 'Property Tax', 'House Value',
+                    'Expenses Compared to Last Home', 'Maintenance Fees', 'Profit', 'Help',
+                    'Profit with Help', 'Rent Saved', 'Rental Income', 'Profit if Saving Rent',
+                    'Profit with Rent Saved&Help', 'Profit with Rental Income',
+                    'Profit with Rental Income&Help']
         # Save to Excel
         sheet_name = f'${house_value}_{annual_interest_rate}%_{amortization_period}years'
-        df.to_excel(writer, sheet_name, index=False)
+        amortization_schedule.to_excel(writer, sheet_name, index=False)
 
         # Access the worksheet object to set column width
         worksheet = writer.sheets[sheet_name]
         # Set column widths based on content
-        for idx, col in enumerate(df.columns):
-            max_len = max(df[col].astype(str).map(len).max(),  # Length of largest item
+        for idx, col in enumerate(amortization_schedule.columns):
+            max_len = max(amortization_schedule[col].astype(str).map(len).max(),  # Length of largest item
                           len(col)) + 1 # Length of column name/header
             worksheet.set_column(idx, idx, max_len)
 

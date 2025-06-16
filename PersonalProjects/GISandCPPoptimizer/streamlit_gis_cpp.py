@@ -153,7 +153,7 @@ def create_visualization(df):
     df['loss'] = df['total_lifetime_net_income'] - optimal_benefit
 
     # Plot 1: Lifetime Loss by CPP Start Age
-    ax1.bar(df['start_time'], df['loss'], width=0.2, color='blue')
+    ax1.bar(df['start_time'], df['loss'], width=0.2, color='red')
     ax1.set_title('Lifetime Loss Compared to Optimal CPP Start Age', fontsize=14, fontweight='bold')
     ax1.set_xlabel('CPP Start Age')
     ax1.set_ylabel('Lifetime Loss ($)')
@@ -471,8 +471,6 @@ def main():
             # Find optimal age and month
             optimal_idx = results_df['total_lifetime_net_income'].idxmax()
             optimal_result = results_df.loc[optimal_idx]
-            
-
 
             # Display results
             col1, col2, col3 = st.columns(3)

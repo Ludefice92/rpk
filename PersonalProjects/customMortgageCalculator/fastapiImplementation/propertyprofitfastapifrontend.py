@@ -1,5 +1,8 @@
 #!/bin/env python3
 import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from propertyprofitfastapibackend import calculate_amortization_schedule, generate_monthly_property_profit_spreadsheet
 
 #TODO: add ad functionality
@@ -268,6 +271,117 @@ def are_inputs_valid(inputs):
 
     if return_val: print("Debug: All inputs are valid")
     return return_val
+    
+def create_visualization(amortization_schedule):
+    """
+    Creates comprehensive matplotlib visualizations to display property profit calculation results.
+    
+    The visualizations are designed to clearly show month by month the profit if the property is sold
+    without any extra monetary help and with monetary help from various sources including rental income,
+    a partner, savings from moving from a rental, etc.
+    
+    Args:
+        amortization_schedule (pandas.DataFrame): Results dataframe from profit calculations
+            
+    Returns:
+        matplotlib.figure.Figure: Complete figure object with two subplots ready for display
+    """
+    fig, ((ax1, ax2)) = plt.subplots(2, 1, figsize=(18, 10))
+
+    # Plot 1: Lifetime Loss by CPP Start Age
+    ax1.plot(amortization_schedule['month'], amortization_schedule['profit_if_sold'], linewidth=2)
+    ax1.set_title('Profit if there is no rental income, help, or savings from renting before', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('Month property is sold')
+    ax1.set_ylabel('Profit ($)')
+    ax1.grid(True, alpha=0.3, axis='y')
+    
+    # Plot 2: Lifetime Benefits Breakdown
+    ax2.plot(amortization_schedule['month'], amortization_schedule['profit_if_sold_rentalincome_help'], marker='o', label='Total', linewidth=2)
+    ax2.set_title('Profit if there is...#TODO this plot should be based on different inputs, title and y axis should change based on this', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('Month property is sold')
+    ax2.set_ylabel('Profit ($)')
+    ax2.grid(True, alpha=0.3, axis='y')
+    
+    ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+
+    plt.tight_layout()
+    return fig
+
+def formatAndDisplayTable(amortization_schedule):
+    """
+    Formats and displays a pandas DataFrame as a styled HTML table in Streamlit.
+    
+    This function converts a pandas DataFrame into a professionally styled HTML table
+    that integrates seamlessly with the Streamlit interface. The function manually
+    generates HTML to ensure consistent styling and proper formatting of financial
+    data, providing better control over appearance than Streamlit's default table display.
+    
+    Args:
+        amortization_schedule (pandas.DataFrame): DataFrame containing the optimization results to display.
+                                     Expected to have formatted string values for financial columns
+                                     and integer values for the month column.
+                                     
+    Returns:
+        None: The function directly renders the HTML table in the Streamlit interface
+              using st.markdown() with unsafe_allow_html=True
+    """
+    # Define always-included columns
+    base_columns = ['month', 'outstanding_balance', 'current_house_value', 'profit_if_sold']
+
+    # Find all profit_* columns (excluding 'profit_if_sold' itself)
+    profit_columns = [col for col in amortization_schedule.columns if col.startswith('profit_') and col != 'profit_if_sold']
+
+    # Filter profit columns where at least one value differs from 'profit_if_sold'
+    variable_profit_columns = [
+        col for col in profit_columns
+        if not (amortization_schedule[col] == amortization_schedule['profit_if_sold']).all()
+    ]
+
+    final_columns = base_columns + variable_profit_columns
+    filtered_df = amortization_schedule[final_columns]
+
+    headers = filtered_df.columns.tolist()
+    rows = filtered_df.values.tolist()
+
+    # Generate HTML table manually
+    table_html = "<table><thead><tr>"
+    for header in headers:
+        table_html += f"<th>{header}</th>"
+    table_html += "</tr></thead><tbody>"
+
+    for row in rows:
+        table_html += "<tr>"
+        for i, item in enumerate(row):
+            # Force 'month' (column index 0) to show as an integer
+            if i == 0 and isinstance(item, (int, float)):
+                table_html += f"<td>{int(item)}</td>"
+            else:
+                table_html += f"<td>{item}</td>"
+        table_html += "</tr>"
+
+    table_html += "</tbody></table>"
+
+    # Apply custom styling to make it look clean
+    st.markdown("""
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #666;
+            padding: 8px;
+            text-align: right;
+        }
+        th {
+            background-color: #333;
+            color: white;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Show the table
+    st.markdown(table_html, unsafe_allow_html=True)
 
 def main():
     """
@@ -295,22 +409,6 @@ def main():
         - Prevents calculation execution with incomplete/invalid data
         - Guides users to correct input issues before proceeding
     """
-    if 'accepted_terms' not in st.session_state:
-        st.session_state.accepted_terms = False
-
-    if not st.session_state.accepted_terms:
-        st.markdown("# Terms of Service")
-        st.markdown("""
-        **Disclaimer:** This tool is provided for informational purposes only and does not constitute financial advice. The calculations and outputs are based solely on the inputs provided by the user and may not account for all individual circumstances, changes in legislation, or other factors that could affect your financial situation.
-
-        To obtain personalized financial advice, please consult a qualified financial advisor or professional. The author of this tool makes no representations or warranties about the accuracy, completeness, or suitability of the information provided. The outputs do not necessarily represent the views of the tool's author.
-
-        By using this tool, you agree that the author is not liable for any decisions made based on the tool's output, and you assume all responsibility for any actions taken as a result of using this tool.
-        """)
-        if st.button("I Accept"):
-            st.session_state.accepted_terms = True
-            st.rerun()
-        return
     # Set page configuration
     st.set_page_config(
         page_title="Property Profit Calculator",
@@ -321,6 +419,24 @@ def main():
 
     # Create columns for layout: left ad, main content, right ad
     col1, col2, col3 = st.columns([1, 6, 1])
+    
+    with col2:
+        if 'accepted_terms' not in st.session_state:
+            st.session_state.accepted_terms = False
+
+        if not st.session_state.accepted_terms:
+            st.markdown("# Terms of Service")
+            st.markdown("""
+            **Disclaimer:** This tool is provided for informational purposes only and does not constitute financial advice. The calculations and outputs are based solely on the inputs provided by the user and may not account for all individual circumstances, changes in legislation, or other factors that could affect your financial situation.
+
+            To obtain personalized financial advice, please consult a qualified financial advisor or professional. The author of this tool makes no representations or warranties about the accuracy, completeness, or suitability of the information provided. The outputs do not necessarily represent the views of the tool's author.
+
+            By using this tool, you agree that the author is not liable for any decisions made based on the tool's output, and you assume all responsibility for any actions taken as a result of using this tool.
+            """)
+            if st.button("I Accept"):
+                st.session_state.accepted_terms = True
+                st.rerun()
+            return
                    
     # Left ad column
     with col1:
@@ -376,21 +492,37 @@ def main():
                 col2.success("All inputs are valid. Performing calculations...")
                 
                 # Get profitability messages and display them
-                _, profitability_messages = calculate_amortization_schedule(inputs)
-                for message in profitability_messages:
-                    col2.write(message)
-                
-                # Generate and provide download for spreadsheet
-                spreadsheet_data = generate_monthly_property_profit_spreadsheet(inputs)
-                col2.write("Click the button below to download the spreadsheet:")
-                col2.download_button(
-                    label="Download Spreadsheet",
-                    data=spreadsheet_data,
-                    file_name="amortization_schedule.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                amortization_schedule, profitability_messages = calculate_amortization_schedule(inputs)
+                # Store results in session state so they aren't removed after generating CSV
+                st.session_state['amortization_schedule'] = amortization_schedule
+                st.session_state['profitability_messages'] = profitability_messages
+                st.session_state['inputs'] = inputs
             else:
                 col2.error("Please fill out all required fields correctly before calculating.")
+    
+        if 'amortization_schedule' in st.session_state:
+            amortization_schedule = st.session_state['amortization_schedule']
+            profitability_messages = st.session_state['profitability_messages']
+            inputs = st.session_state['inputs']
+            #displaying graphs and table
+            st.subheader("📈 Profit over Time")
+            fig = create_visualization(amortization_schedule)
+            st.pyplot(fig)
+            
+            formatAndDisplayTable(amortization_schedule)
+
+            for message in profitability_messages:
+                col2.write(message)
+            
+            # Generate and provide download for spreadsheet
+            spreadsheet_data = generate_monthly_property_profit_spreadsheet(inputs)
+            col2.write("Click the button below to download the spreadsheet:")
+            col2.download_button(
+                label="Download Spreadsheet",
+                data=spreadsheet_data,
+                file_name="amortization_schedule.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )    
     
         # Information section
         col2.markdown("---")
