@@ -142,7 +142,7 @@ def create_visualization(df):
         - Legend to distinguish between different income sources
         - Helps users understand how CPP timing affects each benefit type
     """
-    fig, ((ax1, ax2)) = plt.subplots(2, 1, figsize=(18, 10))
+    fig, ((ax2, ax1)) = plt.subplots(2, 1, figsize=(18, 10))
     df['start_time'] = df['start_age'] + (df['start_month'] - 1) / 12.0
     # Calculate optimal
     optimal_idx = df['total_lifetime_net_income'].idxmax()
@@ -446,7 +446,8 @@ def main():
         birth_month = months.index(birth_month_str) + 1
         
         # Validate inputs
-        validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, retirement_months_delay, oas_monthly, oas_delay_months, rrif_monthly)
+        validation_errors = validate_inputs(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age,
+                                            retirement_months_delay, oas_monthly, oas_delay_months, rrif_monthly)
         
         if validation_errors:
             col2.error("Please fix the following input errors:")
@@ -457,67 +458,77 @@ def main():
         # Calculate optimization results
         if col2.button("🔍 Optimize CPP Start Age", type="primary"):
             with st.spinner("Calculating optimal CPP start age..."):
-                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age, retirement_months_delay, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly)
-                
-                # Find optimal age and month
-                optimal_idx = results_df['total_lifetime_net_income'].idxmax()
-                optimal_result = results_df.loc[optimal_idx]
-                
-                # Display results
-                col1, col2, col3 = st.columns(3)
-                
-                st.metric(
-                    "🎯 Optimal CPP Start Age",
-                    f"{int(optimal_result['start_age'])} years, {int(optimal_result['start_month'])} months",
-                    help="Age and month that maximizes total lifetime income"
-                )
-                
-                st.metric(
-                    "💰 Maximum Total Lifetime Net Income",
-                    f"${optimal_result['total_lifetime_net_income']:,.0f}",
-                    help="Total income over your lifetime"
-                )
-                #    st.metric(
-                #        "📅 Monthly Benefits at Optimal Age",
-                #        f"${optimal_result['total_monthly']:.0f}",
-                #        help="Combined CPP + GIS monthly amount"
-                #    )
-                # Create and display visualizations
-                st.subheader("📈 Optimization Analysis")
-                fig = create_visualization(results_df)
-                st.pyplot(fig)
-                
-                # Display detailed results table
-                st.subheader("📋 Detailed Results")
-                
-                # Format the dataframe for display
-                display_df = results_df.copy()
-                
-                # Rename columns for display
-                display_df.columns = [
-                    'Start Age', 'Start Month', 'Lifetime CPP ($)', 'Lifetime OAS ($)', 'Lifetime GIS ($)', 'Lifetime Other Taxable Income ($)', 
-                    'Lifetime RRIF Income ($)', 'Total Lifetime Gross Income ($)', 'Lifetime Taxes ($)', 'Total Lifetime Net Income ($)'
-                ]
-                
-                # Format values
-                display_df['Start Age'] = display_df['Start Age'].astype(int)
-                display_df['Start Month'] = display_df['Start Month'].astype(int)
+                results_df = optimize_cpp_start_age(gis_monthly, cpp_monthly, life_expectancy, pre_retirement_taxable_monthly, post_retirement_taxable_monthly, retirement_age,
+                                                    retirement_months_delay, province, oas_monthly, oas_delay_months, birth_month, rrif_monthly)
 
-                for col in display_df.columns:
-                    if col not in ['Start Age', 'Start Month']:
-                        display_df[col] = display_df[col].map(lambda x: f"{x:,.2f}")
+                # Store results in session state so they aren't removed after generating CSV
+                st.session_state['results_df'] = results_df
 
-                formatAndDisplayTable(display_df)
-                #col1, col2 = st.columns(2) #REMOVE?
-                
-                # Download option
-                csv = results_df.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Results as CSV",
-                    data=csv,
-                    file_name=f"cpp_optimization_results_{datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv"
-                )
+        # If results are available in session state
+        if 'results_df' in st.session_state:
+            results_df = st.session_state['results_df']
+
+            # Find optimal age and month
+            optimal_idx = results_df['total_lifetime_net_income'].idxmax()
+            optimal_result = results_df.loc[optimal_idx]
+            
+
+
+            # Display results
+            col1, col2, col3 = st.columns(3)
+            
+            st.metric(
+                "🎯 Optimal CPP Start Age",
+                f"{int(optimal_result['start_age'])} years, {int(optimal_result['start_month'])} months",
+                help="Age and month that maximizes total lifetime income"
+            )
+            
+            st.metric(
+                "💰 Maximum Total Lifetime Net Income",
+                f"${optimal_result['total_lifetime_net_income']:,.0f}",
+                help="Total income over your lifetime"
+            )
+            #    st.metric(
+            #        "📅 Monthly Benefits at Optimal Age",
+            #        f"${optimal_result['total_monthly']:.0f}",
+            #        help="Combined CPP + GIS monthly amount"
+            #    )
+            # Create and display visualizations
+            st.subheader("📈 Optimization Analysis")
+            fig = create_visualization(results_df)
+            st.pyplot(fig)
+            
+            # Display detailed results table
+            st.subheader("📋 Detailed Results")
+            
+            # Format the dataframe for display
+            display_df = results_df.copy()
+            
+            # Rename columns for display
+            display_df.columns = [
+                'Start Age', 'Start Month', 'Lifetime CPP ($)', 'Lifetime OAS ($)', 'Lifetime GIS ($)', 'Lifetime Other Taxable Income ($)', 
+                'Lifetime RRIF Income ($)', 'Total Lifetime Gross Income ($)', 'Lifetime Taxes ($)', 'Total Lifetime Net Income ($)'
+            ]
+            
+            # Format values
+            display_df['Start Age'] = display_df['Start Age'].astype(int)
+            display_df['Start Month'] = display_df['Start Month'].astype(int)
+
+            for col in display_df.columns:
+                if col not in ['Start Age', 'Start Month']:
+                    display_df[col] = display_df[col].map(lambda x: f"{x:,.2f}")
+
+            formatAndDisplayTable(display_df)
+            #col1, col2 = st.columns(2) #REMOVE?
+            
+            # Download option
+            csv = results_df.round(2).to_csv(index=False)
+            st.download_button(
+                label="📥 Download Results as CSV",
+                data=csv,
+                file_name=f"cpp_optimization_results_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
         
         # Information section
         st.markdown("---")

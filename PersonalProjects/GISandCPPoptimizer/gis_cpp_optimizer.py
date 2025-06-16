@@ -237,7 +237,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             annual_other = round(other_taxable_monthly * 12, 2)
             annual_rrif = round(actual_rrif * 12, 2)
 
-            total_annual_taxable_income = annual_cpp + annual_oas + annual_other + annual_rrif
+            total_annual_taxable_income = round(annual_cpp + annual_oas + annual_other + annual_rrif, 2)
             taxes = round(calculate_total_taxes(province, total_annual_taxable_income), 2)
 
             # Calculate GIS reduction after taxes
@@ -250,7 +250,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             else:
                 annual_gis = 0
 
-            annual_income = round(annual_cpp + annual_oas + annual_gis + annual_other + annual_rrif, 2)
+            gross_annual_income = round(total_annual_taxable_income + annual_gis, 2)
 
             print(f"annual GIS: {annual_gis}, annual CPP: {annual_cpp}, annual OAS: {annual_oas}, annual RRIF: {annual_rrif}, taxes: {taxes}, cpp_fact: {adjustment_factor} for curAge: {curAge} and start age: {cpp_effective_age} and start month: {delay_mod}\n---------------------------------------")
 
@@ -260,7 +260,7 @@ def optimize_cpp_start_age(gis_base, cpp_base, life_expectancy, pre_retirement_t
             cumulative_other_income += annual_other
             cumulative_rrif_income += annual_rrif
             cumulative_taxes += taxes
-            cumulative_income += annual_income
+            cumulative_income += gross_annual_income
             
         results.append({
             'start_age': cpp_effective_age - carry_over,
