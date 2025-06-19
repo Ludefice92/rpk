@@ -146,7 +146,6 @@ def create_visualization(df):
     df['start_time'] = df['start_age'] + (df['start_month'] - 1) / 12.0
     # Calculate optimal
     optimal_idx = df['total_lifetime_net_income'].idxmax()
-    optimal_start_time = df.loc[optimal_idx, 'start_time']
     optimal_benefit = df.loc[optimal_idx, 'total_lifetime_net_income']
 
     # Calculate losses
@@ -349,7 +348,6 @@ def main():
             min_value=0.0,
             max_value=3000.0,
             value=1100.0,
-            step=10.0,
             help="Your expected monthly Guaranteed Income Supplement amount"
         )
         
@@ -358,7 +356,6 @@ def main():
             min_value=0.0,
             max_value=5000.0,
             value=1400.0,
-            step=10.0,
             help="Your expected monthly CPP amount if you start at age 65"
         )
 
@@ -367,7 +364,6 @@ def main():
             min_value=0.0,
             max_value=3000.0,
             value=750.0,
-            step=10.0,
             help="Your expected monthly OAS amount if you start at age 65"
         )
 
@@ -384,7 +380,6 @@ def main():
             min_value=0,
             max_value=20000,
             value=6000,
-            step=10,
             help="How much you make from all taxable income sources per month before retirement, including net self-employment income and RRSP withdrawals, except for CPP/OAS/GIS and forced RRIF withdrawals"
         )
         post_retirement_taxable_monthly = col2.number_input(
@@ -392,7 +387,6 @@ def main():
             min_value=0,
             max_value=20000,
             value=0,
-            step=10,
             help="How much you make from all taxable income sources per month after retirement, including net self-employment income and RRSP withdrawals, except for CPP/OAS/GIS and forced RRIF withdrawals"
         )
         retirement_age = col2.number_input(
@@ -426,7 +420,6 @@ def main():
                 min_value=0.0,
                 max_value=50000.0,
                 value=1000.0,
-                step=50.0,
                 help="Your expected monthly RRIF income starting at age 71 (forced RRSP conversion)"
             )
         

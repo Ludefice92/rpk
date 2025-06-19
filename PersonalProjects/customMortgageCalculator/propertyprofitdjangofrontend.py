@@ -3,13 +3,14 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
-from propertyprofitstreamlitbackend import calculate_amortization_schedule, generate_monthly_property_profit_spreadsheet
+from propertyprofitbackend import calculate_amortization_schedule, generate_monthly_property_profit_spreadsheet
 
 #TODO: add ad functionality
 #TODO: make a website for this instead of using localhost
 #TODO: update such that the output spreadsheet has the correct number of columns for every single type of situation (right now just printing 0s for columns that aren't relevant)
+#TODO: Convert this implementation from streamlit to django
 
-def initialize_webpage():
+def initialize_webpage(col2):
     """
     Initializes the Streamlit web interface and collects all user inputs for property profit calculations.
     
@@ -29,96 +30,218 @@ def initialize_webpage():
     """
     inputs = {}
 
-    # Collect numeric inputs using text boxes
     primary_residence = st.radio("Is this property going to be your primary residence?", ("Yes", "No"))
     inputs["primary_residence"] = primary_residence
     if primary_residence == "No":
         rental_income_expected = st.radio("Is there expected rental income?", ("Yes", "No"))
         inputs["rental_income_expected"] = rental_income_expected
         if rental_income_expected == "Yes":
-            rental_income = st.text_input("How much rental income is expected per month?", value="2000")
-            inputs["rental_income"] = float(rental_income) if rental_income else 0.0
-            rental_income_annual_increase = st.text_input("How much will you increase the rent for your new property each year (in %)?", value="2.5")
-            inputs["rental_income_annual_increase"] = float(rental_income_annual_increase) if rental_income_annual_increase else 0.0
-            occupancy_rate = st.text_input("What is the occupancy rate of your new rental (in %, 95 is the max allowed)?", value="90")
-            inputs["occupancy_rate"] = float(occupancy_rate) if occupancy_rate else 0.0
+            rental_income = col2.number_input(
+                "How much rental income is expected per month?",
+                min_value=500.0,
+                max_value=50000.0,
+                value=2000.0,
+                help="Expected monthly rental income in Canadian dollars"
+            )
+            inputs["rental_income"] = rental_income
+
+            rental_income_annual_increase = col2.number_input(
+                "How much will you increase the rent for your new property each year (in %)?",
+                min_value=0.01,
+                max_value=20.0,
+                value=2.5,
+                help="Expected annual percentage increase in rent"
+            )
+            inputs["rental_income_annual_increase"] = rental_income_annual_increase
+
+            occupancy_rate = col2.number_input(
+                "What is the occupancy rate of your new rental (in %, 95 is the max allowed)?",
+                min_value=50.0,
+                max_value=95.0,
+                value=90.0,
+                help="Expected occupancy rate of the rental unit"
+            )
+            inputs["occupancy_rate"] = occupancy_rate
+
             is_property_managed = st.radio("Are you going to pay someone to manage your property for you?", ("Yes", "No"))
             inputs["is_property_managed"] = is_property_managed
             if is_property_managed == "Yes":
-                property_management_fees = st.text_input("How much are you going to pay your property manager (as a % of your rental income, standard is 10)?", value="10")
-                inputs["property_management_fees"] = float(property_management_fees) if property_management_fees else 0.0
+                property_management_fees = col2.number_input(
+                    "How much are you going to pay your property manager (as a % of your rental income, standard is 10)?",
+                    min_value=1.0,
+                    max_value=20.0,
+                    value=10.0,
+                    help="Percentage of rental income paid to the property manager"
+                )
+                inputs["property_management_fees"] = property_management_fees
+
             are_utilities_paid_by_renter = st.radio("Are there utilities that your renter is not paying for?",("Yes", "No"))
             inputs["are_utilities_paid_by_renter"] = are_utilities_paid_by_renter
             if are_utilities_paid_by_renter == "Yes":
-                total_utilities_not_paid_by_occupant = st.text_input("How much are you paying in utilities per month that your renter is not responsible for?",value="100")
-                inputs["total_utilities_not_paid_by_occupant"] = float(total_utilities_not_paid_by_occupant) if total_utilities_not_paid_by_occupant else 0.0
+                total_utilities_not_paid_by_occupant = col2.number_input(
+                    "How much are you paying in utilities per month that your renter is not responsible for?",
+                    min_value=50.0,
+                    max_value=2500.0,
+                    value=100.0
+                )
+                inputs["total_utilities_not_paid_by_occupant"] = total_utilities_not_paid_by_occupant
+
     else:
-        # Check if the user is moving from a rental property
         moving_from_rent = st.radio("Are you moving from a property which you currently rent?", ("Yes", "No"), index=1)
         inputs["moving_from_rent"] = moving_from_rent
         if moving_from_rent == "Yes":
-            current_rent = st.text_input("What is the monthly rent paid?", value="2000")
-            inputs["current_rent"] = float(current_rent) if current_rent else 0.0
-            annual_rent_increase = st.text_input("How much do you estimate your current rent will go up each year (in %)?", value="2.5")
-            inputs["annual_rent_increase"] = float(annual_rent_increase) if annual_rent_increase else 0.0
-        utilities_difference = st.text_input(
-            "How much more do you expect to pay in utilities/month compared to your current residence? (Negative value if less, 0 if same)",
-            value="0")
-        inputs["utilities_difference"] = float(utilities_difference) if utilities_difference else 0.0
+            current_rent = col2.number_input(
+                "What is the monthly rent paid?",
+                min_value=200.0,
+                max_value=5000.0,
+                value=2000.0
+            )
+            inputs["current_rent"] = current_rent
 
-    # Check if the property is a condo
+            annual_rent_increase = col2.number_input(
+                "How much do you estimate your current rent will go up each year (in %)?",
+                min_value=0.01,
+                max_value=5000.0,
+                value=2.5
+            )
+            inputs["annual_rent_increase"] = annual_rent_increase
+
+        utilities_difference = col2.number_input(
+            "How much more do you expect to pay in utilities/month compared to your current residence? (Negative value if less, 0 if same)",
+            min_value=-2500.0,
+            max_value=2500.0,
+            value=0.0
+        )
+        inputs["utilities_difference"] = utilities_difference
+
     is_condo = st.radio("Is the property a condo?", ("Yes", "No"), index=1)
     inputs["is_condo"] = is_condo
     if is_condo == "Yes":
-        condo_fees = st.text_input("What are the monthly condo fees?", value="400")
-        inputs["condo_fees"] = float(condo_fees) if condo_fees else 0.0
-        condo_fee_annual_increase = st.text_input("How much do the condo fees increase each year (in %)?", value="2")
-        inputs["condo_fee_annual_increase"] = float(condo_fee_annual_increase) if condo_fee_annual_increase else 0.0
+        condo_fees = col2.number_input(
+            "What are the monthly condo fees?",
+            min_value=100.0,
+            max_value=3500.0,
+            value=400.0
+        )
+        inputs["condo_fees"] = condo_fees
 
-    # Check if user is getting help from someone monthly to pay for their mortgage
+        condo_fee_annual_increase = col2.number_input(
+            "How much do the condo fees increase each year (in %)?",
+            min_value=0.01,
+            max_value=10.0,
+            value=2.0
+        )
+        inputs["condo_fee_annual_increase"] = condo_fee_annual_increase
+
     if_help = st.radio("Are you getting assistance from someone each month (renting a room, from parents, a partner, etc)?", ("Yes", "No"), index=1)
     inputs["help"] = if_help
     if if_help == "Yes":
-        monthly_help = st.text_input("How much are you getting each month?", value="500")
-        inputs["monthly_help"] = float(monthly_help) if monthly_help else 0.0
+        monthly_help = col2.number_input(
+            "How much are you getting each month?",
+            min_value=50.0,
+            max_value=20000.0,
+            value=500.0
+        )
+        inputs["monthly_help"] = monthly_help
 
-    interest_rate = st.text_input("Interest rate of your loan (in %)", value="5")
-    inputs["interest_rate"] = float(interest_rate) if interest_rate else 0.0
+    interest_rate = col2.number_input(
+        "Interest rate of your loan (in %)",
+        min_value=0.01,
+        max_value=20.0,
+        value=5.0
+    )
+    inputs["interest_rate"] = interest_rate
 
-    house_price = st.text_input("House price", value="500000")
-    inputs["house_price"] = float(house_price) if house_price else 0.0
+    property_price = col2.number_input(
+        "Property price",
+        min_value=50000.0,
+        max_value=50000000.0,
+        value=500000.0
+    )
+    inputs["property_price"] = property_price
 
-    down_payment_percentage = st.text_input("Down payment (as a % of house price)", value="20")
-    inputs["down_payment_percentage"] = float(down_payment_percentage) if down_payment_percentage else 0.0
+    down_payment_percentage = col2.number_input(
+        "Down payment (as a % of property price)",
+        min_value=5.0,
+        max_value=75.0,
+        value=20.0
+    )
+    inputs["down_payment_percentage"] = down_payment_percentage
 
-    appreciation_rate = st.text_input("Expected annual appreciation rate of your new property (in %)", value="2")
-    inputs["appreciation_rate"] = float(appreciation_rate) if appreciation_rate else 0.0
+    appreciation_rate = col2.number_input(
+        "Expected annual appreciation rate of your new property (in %)",
+        min_value=0.01,
+        max_value=10.0,
+        value=2.0
+    )
+    inputs["appreciation_rate"] = appreciation_rate
 
-    amortization_period = st.text_input("What is the amortization period (in years)?", value="25")
-    inputs["amortization_period"] = int(amortization_period) if amortization_period else 0
+    amortization_period = col2.number_input(
+        "What is the amortization period (in years)?",
+        min_value=1,
+        max_value=30,
+        value=25
+    )
+    inputs["amortization_period"] = amortization_period
 
-    property_taxes = st.text_input("What are the annual property taxes?", value="5000")
-    inputs["property_taxes"] = float(property_taxes) if property_taxes else 0.0
+    property_taxes = col2.number_input(
+        "What are the annual property taxes?",
+        min_value=0.0,
+        max_value=50000.0,
+        value=5000.0
+    )
+    inputs["property_taxes"] = property_taxes
 
-    annual_property_tax_increase = st.text_input("How much do you estimate your property tax will go up each year (in %)?", value="2")
-    inputs["annual_property_tax_increase"] = float(annual_property_tax_increase) if annual_property_tax_increase else 0.0
+    annual_property_tax_increase = col2.number_input(
+        "How much do you estimate your property tax will go up each year (in %)?",
+        min_value=0.01,
+        max_value=10.0,
+        value=2.0
+    )
+    inputs["annual_property_tax_increase"] = annual_property_tax_increase
 
-    real_estate_agent_fee = st.text_input("What is your real estate agent fee when you sell (in %)?", value="5.5")
-    inputs["real_estate_agent_fee"] = float(real_estate_agent_fee) if real_estate_agent_fee else 0.0
+    real_estate_agent_fee = col2.number_input(
+        "What is your real estate agent fee when you sell (in %)?",
+        min_value=0.0,
+        max_value=10.0,
+        value=5.5
+    )
+    inputs["real_estate_agent_fee"] = real_estate_agent_fee
 
-    land_transfer_tax = st.text_input("What is the land transfer tax when you buy your new property?", value="8000")
-    inputs["land_transfer_tax"] = float(land_transfer_tax) if land_transfer_tax else 0.0
+    land_transfer_tax = col2.number_input(
+        "What is the land transfer tax when you buy your new property?",
+        min_value=0.0,
+        max_value=50000.0,
+        value=8000.0
+    )
+    inputs["land_transfer_tax"] = land_transfer_tax
 
-    maintenance_budget = st.text_input("What is your expected monthly maintenance fee budget?", value="300")
-    inputs["monthly_maintenance"] = float(maintenance_budget) if maintenance_budget else 0.0
+    maintenance_budget = col2.number_input(
+        "What is your expected monthly maintenance fee budget?",
+        min_value=100.0,
+        max_value=5000.0,
+        value=300.0
+    )
+    inputs["monthly_maintenance"] = maintenance_budget
 
     is_taxed = st.radio("Will there be a tax on the sale of the property?", ("Yes", "No"), index=1)
     inputs["is_taxed"] = is_taxed
     if is_taxed == "Yes":
-        tax_percentage = st.text_input("What is the tax percentage on the capital gain?", value="35")
-        inputs["tax_percentage"] = float(tax_percentage) if tax_percentage else 0.0
-        factor = st.text_input("What is the factor at which the capital gain is taxed (e.g., 0.5 for 50% taxable)?", value="1")
-        inputs["factor"] = float(factor) if factor else 0.0
+        tax_percentage = col2.number_input(
+            "What is the tax percentage on the capital gain?",
+            min_value=0.01,
+            max_value=99.99,
+            value=35.0
+        )
+        inputs["tax_percentage"] = tax_percentage
+
+        factor = col2.number_input(
+            "What is the factor at which the capital gain is taxed (e.g., 0.5 for 50% taxable)?",
+            min_value=0.01,
+            max_value=1.0,
+            value=1.0
+        )
+        inputs["factor"] = factor
 
     return inputs
 
@@ -144,8 +267,8 @@ def are_inputs_valid(inputs):
         
     Validation Rules:
         - Interest rate: 0-20%
-        - House price: $50,000-$50,000,000
-        - Down payment: 5-75% of house price
+        - Property price: $50,000-$50,000,000
+        - Down payment: 5-75% of property price
         - Appreciation rate: 0-10% annually
         - Amortization period: 1-30 years
         - Property taxes: $0-$50,000 annually
@@ -158,7 +281,7 @@ def are_inputs_valid(inputs):
     #print("Debug: Checking input values:", inputs)
 
     required_keys = [
-        "interest_rate", "house_price", "down_payment_percentage", "appreciation_rate", "amortization_period", "property_taxes",
+        "interest_rate", "property_price", "down_payment_percentage", "appreciation_rate", "amortization_period", "property_taxes",
         "monthly_maintenance", "land_transfer_tax", "real_estate_agent_fee", "annual_property_tax_increase"
     ]
     # TODO: nothing recognizes a 0 input, this is an issue for parameters where 0 is valid...maybe an issue with the way it's initially defined
@@ -175,8 +298,8 @@ def are_inputs_valid(inputs):
         print("Debug: Missing interest_rate, or not above 0 and below or equal to 20")
         return_val = False
 
-    if not inputs.get("house_price") or (inputs.get("house_price") < 50000 or inputs.get("house_price") > 50000000):
-        print("Debug: Missing house price, or it's not between 50000 and 50000000")
+    if not inputs.get("property_price") or (inputs.get("property_price") < 50000 or inputs.get("property_price") > 50000000):
+        print("Debug: Missing property price, or it's not between 50000 and 50000000")
         return_val = False
 
     if not inputs.get("down_payment_percentage") or (inputs.get("down_payment_percentage") < 5 or inputs.get("down_payment_percentage") > 75):
@@ -266,12 +389,12 @@ def are_inputs_valid(inputs):
             print("Debug: Invalid factor, must be greater than 0 and less than or equal to 1")
             return_val = False
 
-    print("\n\n\n\n\n")
+    print("-----------------------------")
 
     if return_val: print("Debug: All inputs are valid")
     return return_val
 
-def create_visualization(amortization_schedule):
+def create_visualization(amortization_schedule, variable_profit_columns):
     """
     Creates comprehensive matplotlib visualizations to display property profit calculation results.
     
@@ -288,17 +411,29 @@ def create_visualization(amortization_schedule):
     fig, ((ax1, ax2)) = plt.subplots(2, 1, figsize=(18, 10))
 
     # Plot 1: Lifetime Loss by CPP Start Age
-    ax1.plot(amortization_schedule['month'], amortization_schedule['profit_if_sold'], linewidth=2)
+    ax1.plot(amortization_schedule['Month'], amortization_schedule['Profit'], linewidth=2)
     ax1.set_title('Profit if there is no rental income, help, or savings from renting before', fontsize=14, fontweight='bold')
     ax1.set_xlabel('Month property is sold')
     ax1.set_ylabel('Profit ($)')
     ax1.grid(True, alpha=0.3, axis='y')
     
     # Plot 2: Lifetime Benefits Breakdown
-    ax2.plot(amortization_schedule['month'], amortization_schedule['profit_if_sold_rentalincome_help'], marker='o', label='Total', linewidth=2)
+    if len(variable_profit_columns) > 0:
+        if 'Profit if Saving Rent' in variable_profit_columns:
+            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit if Saving Rent'], marker='^', label='Rent Saved', linewidth=2)
+        if 'Profit with Help' in variable_profit_columns:
+            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Help'], marker='s', label='Help', linewidth=2)
+        if 'Profit with Rent Saved&Help' in variable_profit_columns:
+            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rent Saved&Help'], marker='x', label='Rent Saved+Help', linewidth=2)
+        if 'Profit with Rental Income' in variable_profit_columns:
+            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rental Income'], marker='*', label='Rental Income', linewidth=2)
+        if 'Profit with Rent Saved&Help' in variable_profit_columns:
+            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rent Saved&Help'], marker='D', label='Rental Income+Help', linewidth=2)
+    ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit'], marker='o', label='No modifiers', linewidth=2)
     ax2.set_title('Profit if there is...#TODO this plot should be based on different inputs, title and y axis should change based on this', fontsize=14, fontweight='bold')
     ax2.set_xlabel('Month property is sold')
     ax2.set_ylabel('Profit ($)')
+    ax2.legend()
     ax2.grid(True, alpha=0.3, axis='y')
     
     ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
@@ -306,7 +441,7 @@ def create_visualization(amortization_schedule):
     plt.tight_layout()
     return fig
 
-def formatAndDisplayTable(amortization_schedule):
+def formatAndDisplayTable(amortization_schedule, variable_profit_columns):
     """
     Formats and displays a pandas DataFrame as a styled HTML table in Streamlit.
     
@@ -325,16 +460,7 @@ def formatAndDisplayTable(amortization_schedule):
               using st.markdown() with unsafe_allow_html=True
     """
     # Define always-included columns
-    base_columns = ['month', 'outstanding_balance', 'current_house_value', 'profit_if_sold']
-
-    # Find all profit_* columns (excluding 'profit_if_sold' itself)
-    profit_columns = [col for col in amortization_schedule.columns if col.startswith('profit_') and col != 'profit_if_sold']
-
-    # Filter profit columns where at least one value differs from 'profit_if_sold'
-    variable_profit_columns = [
-        col for col in profit_columns
-        if not (amortization_schedule[col] == amortization_schedule['profit_if_sold']).all()
-    ]
+    base_columns = ['Month', 'Loan Balance', 'Property Value', 'Profit']
 
     final_columns = base_columns + variable_profit_columns
     filtered_df = amortization_schedule[final_columns]
@@ -436,7 +562,7 @@ def main():
                 st.session_state.accepted_terms = True
                 st.rerun()
             return
-                
+
     # Left ad column
     with col1:
         st.header("Ads")
@@ -473,7 +599,7 @@ def main():
         - Various expenses and scenarios
         """)
 
-        inputs = initialize_webpage()
+        inputs = initialize_webpage(col2)
                                                                              
         # Initialize session state for input validation
         if "inputs_valid" not in st.session_state:
@@ -492,6 +618,7 @@ def main():
                 
                 # Get profitability messages and display them
                 amortization_schedule, profitability_messages = calculate_amortization_schedule(inputs)
+
                 # Store results in session state so they aren't removed after generating CSV
                 st.session_state['amortization_schedule'] = amortization_schedule
                 st.session_state['profitability_messages'] = profitability_messages
@@ -503,18 +630,27 @@ def main():
             amortization_schedule = st.session_state['amortization_schedule']
             profitability_messages = st.session_state['profitability_messages']
             inputs = st.session_state['inputs']
+
+            # Filter profit columns where at least one value differs from 'Profit'
+            profit_columns = [col for col in amortization_schedule.columns if col.startswith('Profit') and col != 'Profit']
+
+            variable_profit_columns = [
+                col for col in profit_columns
+                if not (amortization_schedule[col] == amortization_schedule['Profit']).all()
+            ]
+
             #displaying graphs and table
             st.subheader("📈 Profit over Time")
-            fig = create_visualization(amortization_schedule)
+            fig = create_visualization(amortization_schedule, variable_profit_columns)
             st.pyplot(fig)
             
-            formatAndDisplayTable(amortization_schedule)
+            formatAndDisplayTable(amortization_schedule, variable_profit_columns)
 
             for message in profitability_messages:
                 col2.write(message)
             
             # Generate and provide download for spreadsheet
-            spreadsheet_data = generate_monthly_property_profit_spreadsheet(inputs)
+            spreadsheet_data = generate_monthly_property_profit_spreadsheet(amortization_schedule, inputs.get("property_price"), inputs.get("interest_rate"), inputs.get("amortization_period"))
             col2.write("Click the button below to download the spreadsheet:")
             col2.download_button(
                 label="Download Spreadsheet",
