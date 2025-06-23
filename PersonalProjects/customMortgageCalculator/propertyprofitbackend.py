@@ -103,6 +103,8 @@ def calculate_amortization_schedule(inputs):
     agent_fee_multiplier = 1 - (inputs.get("real_estate_agent_fee")*0.01)
     current_property_value = inputs.get("property_price") #will increment based on appreciation rate monthly
     appreciation_rate = (1+(inputs.get("appreciation_rate")*0.01))**(1/12) #converting user input to increment on a monthly equivalent basis
+    legal_fees = inputs.get("legal_fees")
+    breaking_mortgage_early_fee = inputs.get("breaking_mortgage_early_fee")
 
     #condo specific
     if inputs.get("is_condo") == "Yes":
@@ -196,8 +198,10 @@ def calculate_amortization_schedule(inputs):
         else:
             capital_gains_tax = 0
         profit_if_sold = ((current_property_value * agent_fee_multiplier) - land_transfer_tax - total_interest_paid -
-                          opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid -
+                          opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid - legal_fees -
                           total_maintenance_fees_paid - total_utilities_not_paid_by_renter - capital_gains_tax)
+        if month != inputs.get("amortization_period") * 12:
+            profit_if_sold -= breaking_mortgage_early_fee
         if inputs.get("is_condo") == "Yes":
             total_condo_fees_paid += condo_fee_base
             profit_if_sold -= total_condo_fees_paid

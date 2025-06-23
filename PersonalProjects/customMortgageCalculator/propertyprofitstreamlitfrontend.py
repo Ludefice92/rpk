@@ -199,6 +199,14 @@ def initialize_webpage(col2):
     )
     inputs["annual_property_tax_increase"] = annual_property_tax_increase
 
+    maintenance_budget = col2.number_input(
+        "What is your expected monthly maintenance fee budget?",
+        min_value=100.0,
+        max_value=5000.0,
+        value=300.0
+    )
+    inputs["monthly_maintenance"] = maintenance_budget
+
     real_estate_agent_fee = col2.number_input(
         "What is your real estate agent fee when you sell (in %)?",
         min_value=0.0,
@@ -215,14 +223,22 @@ def initialize_webpage(col2):
     )
     inputs["land_transfer_tax"] = land_transfer_tax
 
-    maintenance_budget = col2.number_input(
-        "What is your expected monthly maintenance fee budget?",
-        min_value=100.0,
-        max_value=5000.0,
-        value=300.0
+    legal_fees = col2.number_input(
+        "What are the total legal fees you will pay when you BUY AND SELL your new property?",
+        min_value=0.0,
+        max_value=100000.0,
+        value=5000.0
     )
-    inputs["monthly_maintenance"] = maintenance_budget
+    inputs["legal_fees"] = legal_fees
 
+    breaking_mortgage_early_fee = col2.number_input(
+        "What is the fee for breaking your mortgage loan early to sell before the amortization period is over (if none set to 0)?",
+        min_value=0.0,
+        max_value=0.5*(property_price-(down_payment_percentage*0.01*property_price)),
+        value=0
+    )
+    inputs["breaking_mortgage_early_fee"] = breaking_mortgage_early_fee
+    
     is_taxed = st.radio("Will there be a tax on the sale of the property?", ("Yes", "No"), index=1)
     inputs["is_taxed"] = is_taxed
     if is_taxed == "Yes":
@@ -331,6 +347,14 @@ def are_inputs_valid(inputs):
 
     if not inputs.get("annual_property_tax_increase") or (inputs.get("annual_property_tax_increase") < 0 or inputs.get("annual_property_tax_increase") > 10):
         print("Debug: Missing annual property tax increase, or not above 0 and below or equal to 10")
+        return_val = False
+
+    if not inputs.get("legal_fees") or (inputs.get("legal_fees") < 0 or inputs.get("legal_fees") > 100000):
+        print("Debug: Missing legal fees, or it's not between 0 and 100000")
+        return_val = False
+
+    if not inputs.get("breaking_mortgage_early_fee") or (inputs.get("breaking_mortgage_early_fee") < 0 or inputs.get("breaking_mortgage_early_fee") > 0.5*(inputs.get("property_price")-(inputs.get("down_payment_percentage")*0.01*inputs.get("property_price")))):
+        print("Debug: Missing fee for breaking mortgage, or is not <0 or >half of the loan value")
         return_val = False
 
     # Check if rental income is expected and if the value is provided
