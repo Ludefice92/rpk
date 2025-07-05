@@ -144,14 +144,6 @@ def initialize_webpage(col2):
         )
         inputs["monthly_help"] = monthly_help
 
-    interest_rate = col2.number_input(
-        "Interest rate of your loan (in %)",
-        min_value=0.01,
-        max_value=20.0,
-        value=5.0
-    )
-    inputs["interest_rate"] = interest_rate
-
     property_price = col2.number_input(
         "Property price",
         min_value=50000.0,
@@ -183,6 +175,135 @@ def initialize_webpage(col2):
         value=25
     )
     inputs["amortization_period"] = amortization_period
+
+    fixed_or_variable = st.radio(
+        "Select Mortgage Type:",
+        ["Fixed Rate", "Variable Rate"],
+        index=0,
+        horizontal=True
+    )
+
+    fixed_rate_mortgage = fixed_or_variable == "Fixed Rate"
+    inputs["fixed_rate_mortgage"] = fixed_rate_mortgage
+
+    if fixed_rate_mortgage: #checks if rate is fixed
+        interest_rate = col2.number_input(
+            "Interest rate of your loan (in %)",
+            min_value=0.01,
+            max_value=20.0,
+            value=5.0
+        )
+        inputs["interest_rate"] = interest_rate
+        #pass  # Interest rate input is already defined above
+    else:
+        # Variable rate mortgage options
+        st.write("**Variable Rate Mortgage Configuration**")
+        
+        rate_structure_preset = st.selectbox(
+            "Choose a common structure or create custom:",
+            ["Custom", "5-year renewable terms", "3-year renewable terms", "1-year renewable terms"],
+            help="Select a preset to auto-populate common mortgage renewal patterns"
+        )
+        inputs["rate_structure_preset"] = rate_structure_preset
+        
+        # Initialize rate periods based on preset or custom
+        if rate_structure_preset == "5-year renewable terms":
+            # Calculate how many 5-year periods fit, plus remainder
+            full_periods = amortization_period // 5
+            remainder = amortization_period % 5
+            default_periods = []
+            for i in range(full_periods):
+                default_periods.append({"term_length": 5, "interest_rate": 5.0})
+            if remainder > 0:
+                default_periods.append({"term_length": remainder, "interest_rate": 5.0})
+        elif rate_structure_preset == "3-year renewable terms":
+            full_periods = amortization_period // 3
+            remainder = amortization_period % 3
+            default_periods = []
+            for i in range(full_periods):
+                default_periods.append({"term_length": 3, "interest_rate": 5.0})
+            if remainder > 0:
+                default_periods.append({"term_length": remainder, "interest_rate": 5.0})
+        elif rate_structure_preset == "1-year renewable terms":
+            default_periods = []
+            for i in range(amortization_period):
+                default_periods.append({"term_length": 1, "interest_rate": 5.0})
+        else:  # Custom
+            default_periods = [{"term_length": amortization_period, "interest_rate": 5.0}]
+        
+        # Store the number of periods in session state to maintain across reruns
+        if f"num_rate_periods_{amortization_period}_{rate_structure_preset}" not in st.session_state:
+            st.session_state[f"num_rate_periods_{amortization_period}_{rate_structure_preset}"] = len(default_periods)
+        
+        num_periods = st.session_state[f"num_rate_periods_{amortization_period}_{rate_structure_preset}"]
+        
+        # Collect rate periods
+        rate_periods = []
+        total_years = 0
+        
+        st.write("**Define Rate Periods:**")
+        
+        for i in range(num_periods):
+            col_a, col_b = st.columns(2)
+            
+            with col_a:
+                if i < len(default_periods):
+                    default_term = default_periods[i]["term_length"]
+                else:
+                    default_term = max(1, amortization_period - total_years)
+                    
+                term_length = st.number_input(
+                    f"Period {i+1} - Term Length (years)",
+                    min_value=1,
+                    max_value=amortization_period,
+                    value=default_term,
+                    key=f"term_length_{i}"
+                )
+            
+            with col_b:
+                if i < len(default_periods):
+                    default_rate = default_periods[i]["interest_rate"]
+                else:
+                    default_rate = 5.0
+                    
+                interest_rate_period = st.number_input(
+                    f"Period {i+1} - Interest Rate (%)",
+                    min_value=0.01,
+                    max_value=20.0,
+                    value=default_rate,
+                    key=f"interest_rate_{i}"
+                )
+            
+            rate_periods.append({
+                "term_length": term_length,
+                "interest_rate": interest_rate_period
+            })
+            total_years += term_length
+        
+        # Show running total and validation
+        remaining_years = amortization_period - total_years
+        if remaining_years > 0:
+            st.info(f"⚠️ Remaining years to define: {remaining_years}")
+        elif remaining_years < 0:
+            st.error(f"❌ Total terms exceed amortization by {abs(remaining_years)} years")
+        else:
+            st.success(f"✅ All {amortization_period} years accounted for!")
+        
+        # Buttons to add/remove periods (only for custom)
+        if rate_structure_preset == "Custom":
+            col_add, col_remove = st.columns(2)
+            with col_add:
+                if st.button("➕ Add Rate Period"):
+                    st.session_state[f"num_rate_periods_{amortization_period}_{rate_structure_preset}"] += 1
+                    st.rerun()
+            
+            with col_remove:
+                if st.button("➖ Remove Last Period") and num_periods > 1:
+                    st.session_state[f"num_rate_periods_{amortization_period}_{rate_structure_preset}"] -= 1
+                    st.rerun()
+        
+        inputs["rate_periods"] = rate_periods
+        inputs["total_rate_period_years"] = total_years
 
     property_taxes = col2.number_input(
         "What are the annual property taxes?",
@@ -235,11 +356,11 @@ def initialize_webpage(col2):
     breaking_mortgage_early_fee = col2.number_input(
         "What is the fee for breaking your mortgage loan early to sell before the amortization period is over (if none set to 0)?",
         min_value=0.0,
-        max_value=0.5*(property_price-(down_payment_percentage*0.01*property_price)),
-        value=0
+        max_value=0.5*(float(property_price-(down_payment_percentage*0.01*property_price))),
+        value=0.0
     )
     inputs["breaking_mortgage_early_fee"] = breaking_mortgage_early_fee
-
+    
     is_taxed = st.radio("Will there be a tax on the sale of the property?", ("Yes", "No"), index=1)
     inputs["is_taxed"] = is_taxed
     if is_taxed == "Yes":
@@ -297,7 +418,7 @@ def are_inputs_valid(inputs):
     #print("Debug: Checking input values:", inputs)
 
     required_keys = [
-        "interest_rate", "property_price", "down_payment_percentage", "appreciation_rate", "amortization_period", "property_taxes",
+        "property_price", "down_payment_percentage", "appreciation_rate", "amortization_period", "property_taxes",
         "monthly_maintenance", "land_transfer_tax", "real_estate_agent_fee", "annual_property_tax_increase"
     ]
     # TODO: nothing recognizes a 0 input, this is an issue for parameters where 0 is valid...maybe an issue with the way it's initially defined
@@ -310,106 +431,135 @@ def are_inputs_valid(inputs):
             print(f"Debug: Missing or empty input for {key}")
             return_val = False
 
-    if not inputs.get("interest_rate") or (inputs.get("interest_rate") <= 0 or inputs.get("interest_rate") > 20):
-        print("Debug: Missing interest_rate, or not above 0 and below or equal to 20")
-        return_val = False
+    # Validate interest rate for fixed rate mortgages
+    if inputs.get("fixed_rate_mortgage", True):
+        if not inputs.get("interest_rate") or (inputs.get("interest_rate") <= 0 or inputs.get("interest_rate") > 20):
+            print("Debug: Missing interest_rate, or not above 0 and below or equal to 20")
+            return_val = False
+    else:
+        # Validate variable rate mortgage inputs
+        if not inputs.get("rate_periods"):
+            print("Debug: Missing rate periods for variable rate mortgage")
+            return_val = False
+        else:
+            rate_periods = inputs.get("rate_periods", [])
+            total_years = inputs.get("total_rate_period_years", 0)
+            amortization_period = inputs.get("amortization_period", 0)
+            
+            # Check if total years match amortization period
+            if total_years != amortization_period:
+                print(f"Debug: Rate periods total ({total_years}) doesn't match amortization period ({amortization_period})")
+                return_val = False
+            
+            # Validate each rate period
+            for i, period in enumerate(rate_periods):
+                term_length = period.get("term_length", 0)
+                interest_rate = period.get("interest_rate", 0)
+                
+                if term_length <= 0 or term_length > amortization_period:
+                    print(f"Debug: Invalid term length for period {i+1}: {term_length}")
+                    return_val = False
+                
+                if interest_rate <= 0 or interest_rate > 20:
+                    print(f"Debug: Invalid interest rate for period {i+1}: {interest_rate}")
+                    return_val = False
 
-    if not inputs.get("property_price") or (inputs.get("property_price") < 50000 or inputs.get("property_price") > 50000000):
+    if inputs.get("property_price") is None or (inputs.get("property_price") < 50000 or inputs.get("property_price") > 50000000):
         print("Debug: Missing property price, or it's not between 50000 and 50000000")
         return_val = False
 
-    if not inputs.get("down_payment_percentage") or (inputs.get("down_payment_percentage") < 5 or inputs.get("down_payment_percentage") > 75):
+    if inputs.get("down_payment_percentage") is None or (inputs.get("down_payment_percentage") < 5 or inputs.get("down_payment_percentage") > 75):
         print("Debug: Missing down payment %, or not above between 5 and 75%")
         return_val = False
 
-    if not inputs.get("appreciation_rate") or (inputs.get("appreciation_rate") <= 0 or inputs.get("appreciation_rate") > 10):
+    if inputs.get("appreciation_rate") is None or (inputs.get("appreciation_rate") <= 0 or inputs.get("appreciation_rate") > 10):
         print("Debug: Missing appreciation rate, or not above 0 and below or equal to 10")
         return_val = False
 
-    if not inputs.get("amortization_period") or (inputs.get("amortization_period") < 1 or inputs.get("amortization_period") > 30):
+    if inputs.get("amortization_period") is None or (inputs.get("amortization_period") < 1 or inputs.get("amortization_period") > 30):
         print("Debug: Missing amortization period, or not between 1 and 30 years")
         return_val = False
 
-    if not inputs.get("property_taxes") or (inputs.get("property_taxes") < 0 or inputs.get("property_taxes") > 50000):
+    if inputs.get("property_taxes") is None or (inputs.get("property_taxes") < 0 or inputs.get("property_taxes") > 50000):
         print("Debug: Missing property taxes, or not between 0 and 50000/year")
         return_val = False
 
-    if not inputs.get("monthly_maintenance") or (inputs.get("monthly_maintenance") < 100 or inputs.get("monthly_maintenance") > 5000):
+    if inputs.get("monthly_maintenance") is None or (inputs.get("monthly_maintenance") < 100 or inputs.get("monthly_maintenance") > 5000):
         print("Debug: Missing monthly maintenance, or not between 100 and 5000/month")
         return_val = False
 
-    if not inputs.get("land_transfer_tax") or (inputs.get("land_transfer_tax") < 0 or inputs.get("land_transfer_tax") > 50000):
+    if inputs.get("land_transfer_tax") is None or (inputs.get("land_transfer_tax") < 0 or inputs.get("land_transfer_tax") > 50000):
         print("Debug: Missing land transfer tax, or it's negative or less than or more than 50000")
         return_val = False
 
-    if not inputs.get("real_estate_agent_fee") or (inputs.get("real_estate_agent_fee") < 0 or inputs.get("real_estate_agent_fee") > 10):
+    if inputs.get("real_estate_agent_fee") is None or (inputs.get("real_estate_agent_fee") < 0 or inputs.get("real_estate_agent_fee") > 10):
         print("Debug: Missing real estate agent fee, or it's not between 0 and 10%")
         return_val = False
 
-    if not inputs.get("annual_property_tax_increase") or (inputs.get("annual_property_tax_increase") < 0 or inputs.get("annual_property_tax_increase") > 10):
+    if inputs.get("annual_property_tax_increase") is None or (inputs.get("annual_property_tax_increase") < 0 or inputs.get("annual_property_tax_increase") > 10):
         print("Debug: Missing annual property tax increase, or not above 0 and below or equal to 10")
         return_val = False
 
-    if not inputs.get("legal_fees") or (inputs.get("legal_fees") < 0 or inputs.get("legal_fees") > 100000):
+    if inputs.get("legal_fees") is None or (inputs.get("legal_fees") < 0 or inputs.get("legal_fees") > 100000):
         print("Debug: Missing legal fees, or it's not between 0 and 100000")
         return_val = False
 
-    if not inputs.get("breaking_mortgage_early_fee") or (inputs.get("breaking_mortgage_early_fee") < 0 or inputs.get("breaking_mortgage_early_fee") > 0.5*(inputs.get("property_price")-(inputs.get("down_payment_percentage")*0.01*inputs.get("property_price")))):
-        print("Debug: Missing fee for breaking mortgage, or is not <0 or >half of the loan value")
+    if inputs.get("breaking_mortgage_early_fee") is None or (inputs.get("breaking_mortgage_early_fee") < 0.0 or inputs.get("breaking_mortgage_early_fee") > 0.5*(float(inputs.get("property_price")-(inputs.get("down_payment_percentage")*0.01*inputs.get("property_price"))))):
+        print("Debug: Missing fee for breaking mortgage, or is <0 or >half of the loan value")
         return_val = False
 
     # Check if rental income is expected and if the value is provided
     if inputs.get("expected_rental_income") == "Yes":
-        if not inputs.get("rental_income_amount") or (inputs.get("rental_income_amount")<=500 or inputs.get("rental_income_amount")>=50000):
+        if inputs.get("rental_income_amount") is None or (inputs.get("rental_income_amount")<=500 or inputs.get("rental_income_amount")>=50000):
             print("Debug: Missing rental income amount, or not between 500 and 500000")
             return_val = False
-        if not inputs.get("occupancy_rate") or (inputs.get("occupancy_rate")<50 or inputs.get("occupancy_rate")>95):
+        if inputs.get("occupancy_rate") is None or (inputs.get("occupancy_rate")<50 or inputs.get("occupancy_rate")>95):
             print("Debug: Missing rental income property occupancy rate, or not between 50 and 95%")
             return_val = False
-        if not inputs.get("rental_income_annual_increase") or (inputs.get("rental_income_annual_increase")<=0 or inputs.get("rental_income_annual_increase")>20):
+        if inputs.get("rental_income_annual_increase") is None or (inputs.get("rental_income_annual_increase")<=0 or inputs.get("rental_income_annual_increase")>20):
             print("Debug: Missing rental income annual increase, or it's below/equal to 0 or >20%")
             return_val = False
-        if inputs.get("is_property_managed") == "Yes" and (not inputs.get("property_management_fees") or (inputs.get("property_management_fees")<1 or inputs.get("property_management_fees")>20)):
+        if inputs.get("is_property_managed") == "Yes" and (inputs.get("property_management_fees") is None or (inputs.get("property_management_fees")<1 or inputs.get("property_management_fees")>20)):
             print("Debug: Missing property management fees, or the fees are not in between 1 and 20%")
             return_val = False
-        if not inputs.get("total_utilities_not_paid_by_occupant") or (inputs.get("total_utilities_not_paid_by_occupant") < 50 or inputs.get("total_utilities_not_paid_by_occupant") > 2500):
+        if inputs.get("total_utilities_not_paid_by_occupant") is None or (inputs.get("total_utilities_not_paid_by_occupant") < 50 or inputs.get("total_utilities_not_paid_by_occupant") > 2500):
             print("Debug: Missing utilities not paid by the renter, or not between 50 and 2500")
             return_val = False
 
 
     # Check if the property is a condo and if the condo fees are provided
     if inputs.get("is_condo") == "Yes":
-        if not inputs.get("condo_fees") or (inputs.get("condo_fees")<100 or inputs.get("condo_fees")>3500):
+        if inputs.get("condo_fees") is None or (inputs.get("condo_fees")<100 or inputs.get("condo_fees")>3500):
             print("Debug: Missing condo fees, or it's not between 100 and 3500")
             return_val = False
-        if not inputs.get("condo_fee_annual_increase") or (inputs.get("condo_fee_annual_increase")<=0 or inputs.get("condo_fee_annual_increase")>10):
+        if inputs.get("condo_fee_annual_increase") is None or (inputs.get("condo_fee_annual_increase")<=0 or inputs.get("condo_fee_annual_increase")>10):
             print("Debug: Missing condo fee annual increase, or less than/equal 0 or >10%")
             return_val = False
 
     # Check if moving from rent and if the monthly rent amount is provided
     if inputs.get("moving_from_rent") == "Yes":
-        if not inputs.get("current_rent") or (inputs.get("current_rent")<200 or inputs.get("current_rent")>5000):
+        if inputs.get("current_rent") is None or (inputs.get("current_rent")<200 or inputs.get("current_rent")>5000):
             print("Debug: Missing monthly rent, or not between 200 and 5000")
             return_val = False
-        if not inputs.get("annual_rent_increase") or (inputs.get("annual_rent_increase")<=0 or inputs.get("annual_rent_increase")>5000):
+        if inputs.get("annual_rent_increase") is None or (inputs.get("annual_rent_increase")<=0 or inputs.get("annual_rent_increase")>5000):
             print("Debug: Missing annual rent increase, or not above 0 or less than or equal to 5000")
             return_val = False
-        if not inputs.get("utilities_difference") or (inputs.get("utilities_difference") < -2500 or inputs.get("utilities_difference") > 2500):
+        if inputs.get("utilities_difference") is None or (inputs.get("utilities_difference") < -2500 or inputs.get("utilities_difference") > 2500):
             if inputs.get("utilities_difference") != 0:
                 print("Debug: Missing utilities difference, or between -2500 and 2500")
                 return_val = False
 
     # Check if there is help from family, partner, etc
     if inputs.get("help") == "Yes":
-        if not inputs.get("monthly_help") or (inputs.get("monthly_help")<50 or inputs.get("monthly_help")>20000):
+        if inputs.get("monthly_help") is None or (inputs.get("monthly_help")<50 or inputs.get("monthly_help")>20000):
             print("Debug: Missing monthly help, or not between allowable range of 50 and 20000")
             return_val = False
 
     if inputs.get("is_taxed") == "Yes":
-        if not inputs.get("tax_percentage") or (inputs.get("tax_percentage") <= 0 or inputs.get("tax_percentage") >= 100):
+        if inputs.get("tax_percentage") is None or (inputs.get("tax_percentage") <= 0 or inputs.get("tax_percentage") >= 100):
             print("Debug: Invalid tax percentage, must be greater than 0 and less than 100")
             return_val = False
-        if not inputs.get("factor") or (inputs.get("factor") <= 0 or inputs.get("factor") > 1):
+        if inputs.get("factor") is None or (inputs.get("factor") <= 0 or inputs.get("factor") > 1):
             print("Debug: Invalid factor, must be greater than 0 and less than or equal to 1")
             return_val = False
 

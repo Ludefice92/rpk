@@ -60,6 +60,39 @@ def calculate_interest_payment(outstanding_balance, annual_interest_rate):
     interest_payment = outstanding_balance * monthly_interest_rate
     return round(interest_payment,2)
 
+def get_current_rate(month, fixed_rate_mortgage, interest_rate, rate_periods):
+    """Returns interest rate for given month based on rate periods"""
+    if fixed_rate_mortgage:
+        return interest_rate
+    
+    current_month = 1
+    for period in rate_periods:
+        if current_month <= month <= current_month + (period["term_length"] * 12) - 1:
+            return period["interest_rate"]
+        current_month += period["term_length"] * 12
+    return rate_periods[-1]["interest_rate"] if rate_periods else 5.0
+
+def should_recalculate_payment(month, fixed_rate_mortgage, rate_periods):
+    """Determines if payment needs recalculation due to new loan term starting"""
+    if fixed_rate_mortgage:
+        return month == 1  # Only calculate once for fixed rate
+    
+    if month == 1:
+        return True  # Always calculate for first month
+    
+    # Check if this month starts a new rate period/loan term
+    current_month = 1
+    for period in rate_periods:
+        term_start = current_month
+        term_end = current_month + (period["term_length"] * 12) - 1
+        
+        if month == term_start and month > 1:
+            return True  # New term is starting
+        
+        current_month = term_end + 1
+    
+    return False
+
 def calculate_amortization_schedule(inputs):
     """
     Calculates a comprehensive month-by-month amortization schedule with profit analysis for various scenarios.
@@ -95,8 +128,11 @@ def calculate_amortization_schedule(inputs):
     opportunity_cost = opportunity_cost_base #opportunity cost accounting for money lost by not investing the down payment in the S&P500
     sp500_return = 1.0057 #assuming historical rate of 0.57% per month, using this to model opportunity cost lost from down payment
     principal = inputs.get("property_price") * (1-down_payment_multiplier)
-    monthly_payment = calculate_mortgage_payment(principal, inputs.get("interest_rate"), inputs.get("amortization_period"))
     outstanding_balance = principal
+    
+    # Initialize payment variables for variable rate support
+    monthly_payment = None
+    current_rate = None
     annual_property_tax_base = inputs.get("property_taxes")
     annual_property_tax_increase = 1 + inputs.get("annual_property_tax_increase") * 0.01
     land_transfer_tax = inputs.get("land_transfer_tax")
@@ -180,8 +216,17 @@ def calculate_amortization_schedule(inputs):
             total_rent_saved += rent_base
             total_rental_income += rental_income_base
 
+        # Check if we need to recalculate payment (only at term boundaries)
+        if should_recalculate_payment(month, inputs.get("fixed_rate_mortgage", True), inputs.get("rate_periods", [])):
+            current_rate = get_current_rate(month, inputs.get("fixed_rate_mortgage", True), 
+                                          inputs.get("interest_rate"), inputs.get("rate_periods", []))
+            
+            # Calculate remaining years for this calculation
+            remaining_years = (inputs.get("amortization_period") * 12 - month + 1) / 12
+            monthly_payment = calculate_mortgage_payment(outstanding_balance, current_rate, remaining_years)
+
         opportunity_cost *= sp500_return
-        interest_payment = calculate_interest_payment(outstanding_balance, inputs.get("interest_rate"))
+        interest_payment = calculate_interest_payment(outstanding_balance, current_rate)
         principal_payment = monthly_payment - interest_payment
         outstanding_balance -= principal_payment
         total_interest_paid += interest_payment
@@ -235,6 +280,7 @@ def calculate_amortization_schedule(inputs):
         if inputs.get("is_condo") == "Yes":
             row = {
                 'Month': month,
+                'Current Rate': current_rate,
                 'Monthly Payment': monthly_payment,
                 'Interest Payment': interest_payment,
                 'Principal Payment': principal_payment,
@@ -258,6 +304,7 @@ def calculate_amortization_schedule(inputs):
         else:
             row = {
                 'Month': month,
+                'Current Rate': current_rate,
                 'Monthly Payment': monthly_payment,
                 'Interest Payment': interest_payment,
                 'Principal Payment': principal_payment,
