@@ -601,10 +601,10 @@ def create_visualization(amortization_schedule, variable_profit_columns):
             ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rent Saved&Help'], marker='x', label='Rent Saved+Help', linewidth=2)
         if 'Profit with Rental Income' in variable_profit_columns:
             ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rental Income'], marker='*', label='Rental Income', linewidth=2)
-        if 'Profit with Rent Saved&Help' in variable_profit_columns:
+        if 'Profit with Rental Income&Help' in variable_profit_columns:
             ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rent Saved&Help'], marker='D', label='Rental Income+Help', linewidth=2)
-    ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit'], marker='o', label='No modifiers', linewidth=2)
-    ax2.set_title('Profit if there is...#TODO this plot should be based on different inputs, title and y axis should change based on this', fontsize=14, fontweight='bold')
+    ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit'], marker='o', label='Profit no modifiers', linewidth=2)
+    ax2.set_title('Profit over time under various conditions', fontsize=14, fontweight='bold')
     ax2.set_xlabel('Month property is sold')
     ax2.set_ylabel('Profit ($)')
     ax2.legend()
@@ -813,12 +813,27 @@ def main():
                 if not (amortization_schedule[col] == amortization_schedule['Profit']).all()
             ]
 
-            #displaying graphs and table
+            # Create filtered_variable_profit_columns based on user inputs
+            applicable_columns = []
+            if inputs.get('moving_from_rent') == 'Yes':
+                applicable_columns.append('Profit if Saving Rent')
+            if inputs.get('help') == 'Yes':
+                applicable_columns.append('Profit with Help')
+            if inputs.get('moving_from_rent') == 'Yes' and inputs.get('help') == 'Yes':
+                applicable_columns.append('Profit with Rent Saved&Help')
+            if inputs.get('rental_income_expected') == 'Yes':
+                applicable_columns.append('Profit with Rental Income')
+            if inputs.get('rental_income_expected') == 'Yes' and inputs.get('help') == 'Yes':
+                applicable_columns.append('Profit with Rental Income&Help')
+
+            filtered_variable_profit_columns = [col for col in variable_profit_columns if col in applicable_columns]
+
+            # displaying graphs and table
             st.subheader("📈 Profit over Time")
-            fig = create_visualization(amortization_schedule, variable_profit_columns)
+            fig = create_visualization(amortization_schedule, filtered_variable_profit_columns)
             st.pyplot(fig)
-            
-            formatAndDisplayTable(amortization_schedule, variable_profit_columns)
+
+            formatAndDisplayTable(amortization_schedule, filtered_variable_profit_columns)
 
             for message in profitability_messages:
                 col2.write(message)
