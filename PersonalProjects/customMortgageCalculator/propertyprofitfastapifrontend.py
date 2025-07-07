@@ -152,6 +152,32 @@ def initialize_webpage(col2):
     )
     inputs["property_price"] = property_price
 
+    renovation_required = st.radio("Will there be renovations to this property?", ("Yes", "No"), index=1)
+    inputs["renovation_required"] = renovation_required
+
+    if renovation_required == "Yes":
+        renovation_cost = col2.number_input(
+            "What is the expected cost of renovations?",
+            min_value=1.0,
+            max_value=5.0 * property_price,
+            value=25000.0,
+            help="Total expected renovation costs in Canadian dollars"
+        )
+        inputs["renovation_cost"] = renovation_cost
+        
+        renovation_delay = st.radio("Will renovations delay living in or renting the property?", ("Yes", "No"), index=1)
+        inputs["renovation_delay"] = renovation_delay
+        
+        if renovation_delay == "Yes":
+            renovation_months = col2.number_input(
+                "How many months will the renovations take?",
+                min_value=1,
+                max_value=60,
+                value=3,
+                help="Number of months the property will be unavailable due to renovations"
+            )
+            inputs["renovation_months"] = renovation_months
+
     down_payment_percentage = col2.number_input(
         "Down payment (as a % of property price)",
         min_value=5.0,
@@ -562,6 +588,18 @@ def are_inputs_valid(inputs):
         if inputs.get("factor") is None or (inputs.get("factor") <= 0 or inputs.get("factor") > 1):
             print("Debug: Invalid factor, must be greater than 0 and less than or equal to 1")
             return_val = False
+
+    # Check renovation inputs
+    if inputs.get("renovation_required") == "Yes":
+        property_price = inputs.get("property_price", 0)
+        if inputs.get("renovation_cost") is None or (inputs.get("renovation_cost") < 1 or inputs.get("renovation_cost") > 5.0 * property_price):
+            print("Debug: Missing renovation cost, or not between 1 and 5 times property price")
+            return_val = False
+        
+        if inputs.get("renovation_delay") == "Yes":
+            if inputs.get("renovation_months") is None or (inputs.get("renovation_months") < 1 or inputs.get("renovation_months") > 60):
+                print("Debug: Missing renovation months, or not between 1 and 60 months")
+                return_val = False
 
     print("-----------------------------")
 

@@ -141,6 +141,13 @@ def calculate_amortization_schedule(inputs):
     appreciation_rate = (1+(inputs.get("appreciation_rate")*0.01))**(1/12) #converting user input to increment on a monthly equivalent basis
     legal_fees = inputs.get("legal_fees")
     breaking_mortgage_early_fee = inputs.get("breaking_mortgage_early_fee")
+    
+    # Consolidate all initial one-time costs
+    total_initial_costs = (
+        land_transfer_tax + 
+        legal_fees + 
+        (inputs.get("renovation_cost", 0) if inputs.get("renovation_required") == "Yes" else 0)
+    )
 
     #condo specific
     if inputs.get("is_condo") == "Yes":
@@ -212,9 +219,20 @@ def calculate_amortization_schedule(inputs):
                 rental_income_base *= rental_income_increase_rate
                 if inputs.get("is_property_managed") == "Yes": property_management_fee_base = rental_income_base * inputs.get("property_management_fees") * 0.01
             condo_fee_base *= condo_fee_annual_increase
+        # Add renovation delay logic
+        is_renovation_period = False
+        if inputs.get("renovation_required") == "Yes" and inputs.get("renovation_delay") == "Yes":
+            renovation_months = inputs.get("renovation_months", 0)
+            if month <= renovation_months:
+                is_renovation_period = True
+
         if month != 1:
-            total_rent_saved += rent_base
-            total_rental_income += rental_income_base
+            # Only add income if not in renovation period
+            if not is_renovation_period:
+                total_rent_saved += rent_base
+                total_rental_income += rental_income_base
+                total_property_management_fees += property_management_fee_base
+            # If in renovation period, do nothing (don't add to totals)
 
         # Check if we need to recalculate payment (only at term boundaries)
         if should_recalculate_payment(month, inputs.get("fixed_rate_mortgage", True), inputs.get("rate_periods", [])):
@@ -230,7 +248,6 @@ def calculate_amortization_schedule(inputs):
         principal_payment = monthly_payment - interest_payment
         outstanding_balance -= principal_payment
         total_interest_paid += interest_payment
-        total_property_management_fees += property_management_fee_base
         total_property_tax_paid += annual_property_tax_base/12 #converting annual property tax to monthly
         total_extra_monthly_expenses_paid += extra_monthly_expenses
         total_utilities_not_paid_by_renter += utilities_not_paid_by_occupant
@@ -242,8 +259,8 @@ def calculate_amortization_schedule(inputs):
             capital_gains_tax = capital_gain * inputs["factor"] * (inputs["tax_percentage"] / 100)
         else:
             capital_gains_tax = 0
-        profit_if_sold = ((current_property_value * agent_fee_multiplier) - land_transfer_tax - total_interest_paid -
-                          opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid - legal_fees -
+        profit_if_sold = ((current_property_value * agent_fee_multiplier) - total_initial_costs - total_interest_paid -
+                          opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid -
                           total_maintenance_fees_paid - total_utilities_not_paid_by_renter - capital_gains_tax)
         if month != inputs.get("amortization_period") * 12:
             profit_if_sold -= breaking_mortgage_early_fee
