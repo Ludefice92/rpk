@@ -127,8 +127,7 @@ def calculate_amortization_schedule(inputs):
     opportunity_cost_base = inputs.get("property_price") * down_payment_multiplier
     opportunity_cost = opportunity_cost_base #opportunity cost accounting for money lost by not investing the down payment in the S&P500
     sp500_return = 1.0057 #assuming historical rate of 0.57% per month, using this to model opportunity cost lost from down payment
-    principal = inputs.get("property_price") * (1-down_payment_multiplier)
-    outstanding_balance = principal
+    outstanding_balance = inputs.get("property_price") * (1-down_payment_multiplier) + inputs.get("additional_costs", 0)
     
     # Initialize payment variables for variable rate support
     monthly_payment = None
@@ -148,6 +147,9 @@ def calculate_amortization_schedule(inputs):
         legal_fees + 
         (inputs.get("renovation_cost", 0) if inputs.get("renovation_required") == "Yes" else 0)
     )
+    
+    # Add renovation value increase variable
+    total_renovation_value_increase = inputs.get("renovation_value_increase", 0)
 
     #condo specific
     if inputs.get("is_condo") == "Yes":
@@ -254,6 +256,12 @@ def calculate_amortization_schedule(inputs):
         total_maintenance_fees_paid += inputs.get("monthly_maintenance")
         if inputs.get("help") == "Yes": total_help += inputs.get("monthly_help")
         current_property_value *= appreciation_rate
+        
+        # Add renovation value increase to property value in the month renovations are completed
+        if (month == inputs.get("renovation_months", 0) or
+           (inputs.get("renovation_months") is None and total_renovation_value_increase != 0)):
+            current_property_value += total_renovation_value_increase
+        
         if inputs.get("is_taxed") == "Yes":
             capital_gain = current_property_value - inputs["property_price"]
             capital_gains_tax = capital_gain * inputs["factor"] * (inputs["tax_percentage"] / 100)

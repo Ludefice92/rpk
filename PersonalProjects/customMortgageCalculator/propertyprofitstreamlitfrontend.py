@@ -151,6 +151,16 @@ def initialize_webpage(col2):
     )
     inputs["property_price"] = property_price
 
+    # New input for additional financed costs
+    additional_financed_costs = col2.number_input(
+        "Additional costs to be financed by including it in the mortgage loan",
+        min_value=0.0,
+        max_value=property_price * 2.0,  # Reasonable maximum relative to property price
+        value=0.0,
+        help="Additional costs beyond the property price that will be included in the mortgage loan (e.g., renovations, furnishing, etc.)"
+    )
+    inputs["additional_financed_costs"] = additional_financed_costs
+
     renovation_required = st.radio("Will there be renovations to this property?", ("Yes", "No"), index=1)
     inputs["renovation_required"] = renovation_required
 
@@ -176,6 +186,15 @@ def initialize_webpage(col2):
                 help="Number of months the property will be unavailable due to renovations"
             )
             inputs["renovation_months"] = renovation_months
+        
+        # Add renovation value increase field
+        renovation_value_increase = col2.number_input(
+            "Expected dollar amount increase (or decrease) in property value from renovations",
+            min_value=-500000.0,
+            max_value=2000000.0,
+            value=0.0
+        )
+        inputs["renovation_value_increase"] = renovation_value_increase
 
     down_payment_percentage = col2.number_input(
         "Down payment (as a % of property price)",
@@ -493,6 +512,10 @@ def are_inputs_valid(inputs):
         print("Debug: Missing property price, or it's not between 50000 and 50000000")
         return_val = False
 
+    if inputs.get("additional_financed_costs") is None or (inputs.get("additional_financed_costs") < 0 or inputs.get("additional_financed_costs") > inputs.get("property_price", 0) * 2.0):
+        print("Debug: Missing additional financed costs, or it's negative or more than 200% of property price")
+        return_val = False
+
     if inputs.get("down_payment_percentage") is None or (inputs.get("down_payment_percentage") < 5 or inputs.get("down_payment_percentage") > 75):
         print("Debug: Missing down payment %, or not above between 5 and 75%")
         return_val = False
@@ -599,6 +622,11 @@ def are_inputs_valid(inputs):
             if inputs.get("renovation_months") is None or (inputs.get("renovation_months") < 1 or inputs.get("renovation_months") > 60):
                 print("Debug: Missing renovation months, or not between 1 and 60 months")
                 return_val = False
+        
+        # Validate renovation value increase
+        if inputs.get("renovation_value_increase") is None or (inputs.get("renovation_value_increase") < -500000 or inputs.get("renovation_value_increase") > 2000000):
+            print("Debug: Invalid renovation value increase")
+            return_val = False
 
     print("-----------------------------")
 
