@@ -404,6 +404,15 @@ def initialize_webpage(col2):
         value=0.0
     )
     inputs["breaking_mortgage_early_fee"] = breaking_mortgage_early_fee
+
+    mortgage_insurance_cost = col2.number_input(
+        "What is the monthly mortgage insurance cost? (0 if not required)",
+        min_value=0.0,
+        max_value=100000.0,
+        value=0.0,
+        help="Monthly cost of mortgage insurance. Set to 0 if not required."
+    )
+    inputs["mortgage_insurance_cost"] = mortgage_insurance_cost
     
     is_taxed = st.radio("Will there be a tax on the sale of the property?", ("Yes", "No"), index=1)
     inputs["is_taxed"] = is_taxed
@@ -627,6 +636,10 @@ def are_inputs_valid(inputs):
         if inputs.get("renovation_value_increase") is None or (inputs.get("renovation_value_increase") < -500000 or inputs.get("renovation_value_increase") > 2000000):
             print("Debug: Invalid renovation value increase")
             return_val = False
+
+    if inputs.get("mortgage_insurance_cost") is None or (inputs.get("mortgage_insurance_cost") < 0 or inputs.get("mortgage_insurance_cost") > 100000):
+        print("Debug: Invalid mortgage insurance cost, must be between 0 and 100000")
+        return_val = False
 
     print("-----------------------------")
 

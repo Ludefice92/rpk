@@ -127,7 +127,7 @@ def calculate_amortization_schedule(inputs):
     opportunity_cost_base = inputs.get("property_price") * down_payment_multiplier
     opportunity_cost = opportunity_cost_base #opportunity cost accounting for money lost by not investing the down payment in the S&P500
     sp500_return = 1.0057 #assuming historical rate of 0.57% per month, using this to model opportunity cost lost from down payment
-    outstanding_balance = inputs.get("property_price") * (1-down_payment_multiplier) + inputs.get("additional_costs", 0)
+    outstanding_balance = inputs.get("property_price") * (1-down_payment_multiplier) + inputs.get("additional_financed_costs", 0)
     
     # Initialize payment variables for variable rate support
     monthly_payment = None
@@ -200,6 +200,7 @@ def calculate_amortization_schedule(inputs):
     total_rental_income = rental_income_base
     total_property_management_fees = property_management_fee_base
     total_utilities_not_paid_by_renter = 0
+    total_mortgage_insurance_paid = 0
 
     #covering all possibilities for profitability given user inputs
     profitability_messages = []
@@ -254,6 +255,7 @@ def calculate_amortization_schedule(inputs):
         total_extra_monthly_expenses_paid += extra_monthly_expenses
         total_utilities_not_paid_by_renter += utilities_not_paid_by_occupant
         total_maintenance_fees_paid += inputs.get("monthly_maintenance")
+        total_mortgage_insurance_paid += inputs.get("mortgage_insurance_cost", 0)
         if inputs.get("help") == "Yes": total_help += inputs.get("monthly_help")
         current_property_value *= appreciation_rate
         
@@ -269,7 +271,8 @@ def calculate_amortization_schedule(inputs):
             capital_gains_tax = 0
         profit_if_sold = ((current_property_value * agent_fee_multiplier) - total_initial_costs - total_interest_paid -
                           opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid -
-                          total_maintenance_fees_paid - total_utilities_not_paid_by_renter - capital_gains_tax)
+                          total_maintenance_fees_paid - total_utilities_not_paid_by_renter - capital_gains_tax -
+                          total_mortgage_insurance_paid)
         if month != inputs.get("amortization_period") * 12:
             profit_if_sold -= breaking_mortgage_early_fee
         if inputs.get("is_condo") == "Yes":
@@ -316,6 +319,7 @@ def calculate_amortization_schedule(inputs):
                 'Expenses Compared to Last Home': total_extra_monthly_expenses_paid,
                 'Maintenance Fees': total_maintenance_fees_paid,
                 'Condo Fees': total_condo_fees_paid,
+                'Mortgage Insurance Paid': total_mortgage_insurance_paid,
                 'Profit': profit_if_sold,
                 'Help': total_help,
                 'Profit with Help': profit_if_sold_with_help,
@@ -339,6 +343,7 @@ def calculate_amortization_schedule(inputs):
                 'Property Value': current_property_value,
                 'Expenses Compared to Last Home': total_extra_monthly_expenses_paid,
                 'Maintenance Fees': total_maintenance_fees_paid,
+                'Mortgage Insurance Paid': total_mortgage_insurance_paid,
                 'Profit': profit_if_sold,
                 'Help': total_help,
                 'Profit with Help': profit_if_sold_with_help,
