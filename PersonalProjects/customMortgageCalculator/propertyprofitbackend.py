@@ -184,6 +184,10 @@ def calculate_amortization_schedule(inputs):
     else:
         property_management_fee_base = 0
 
+    # Property insurance variables
+    property_insurance_base = inputs.get("property_insurance", 0)
+    property_insurance_annual_increase = 1 + inputs.get("property_insurance_annual_increase", 0) * 0.01
+
     if inputs["primary_residence"] == "Yes":
         extra_monthly_expenses = inputs.get("utilities_difference")
     else:
@@ -201,6 +205,7 @@ def calculate_amortization_schedule(inputs):
     total_property_management_fees = property_management_fee_base
     total_utilities_not_paid_by_renter = 0
     total_mortgage_insurance_paid = 0
+    total_property_insurance_paid = 0
 
     #covering all possibilities for profitability given user inputs
     profitability_messages = []
@@ -222,6 +227,8 @@ def calculate_amortization_schedule(inputs):
                 rental_income_base *= rental_income_increase_rate
                 if inputs.get("is_property_managed") == "Yes": property_management_fee_base = rental_income_base * inputs.get("property_management_fees") * 0.01
             condo_fee_base *= condo_fee_annual_increase
+            # Update property insurance annually
+            property_insurance_base *= property_insurance_annual_increase
         # Add renovation delay logic
         is_renovation_period = False
         if inputs.get("renovation_required") == "Yes" and inputs.get("renovation_delay") == "Yes":
@@ -257,6 +264,8 @@ def calculate_amortization_schedule(inputs):
         total_maintenance_fees_paid += inputs.get("monthly_maintenance")
         total_mortgage_insurance_paid += inputs.get("mortgage_insurance_cost", 0)
         if inputs.get("help") == "Yes": total_help += inputs.get("monthly_help")
+        # Add to monthly totals
+        total_property_insurance_paid += property_insurance_base
         current_property_value *= appreciation_rate
         
         # Add renovation value increase to property value in the month renovations are completed
@@ -272,7 +281,7 @@ def calculate_amortization_schedule(inputs):
         profit_if_sold = ((current_property_value * agent_fee_multiplier) - total_initial_costs - total_interest_paid -
                           opportunity_cost - outstanding_balance - total_extra_monthly_expenses_paid -
                           total_maintenance_fees_paid - total_utilities_not_paid_by_renter - capital_gains_tax -
-                          total_mortgage_insurance_paid)
+                          total_mortgage_insurance_paid - total_property_insurance_paid)
         if month != inputs.get("amortization_period") * 12:
             profit_if_sold -= breaking_mortgage_early_fee
         if inputs.get("is_condo") == "Yes":
@@ -320,6 +329,7 @@ def calculate_amortization_schedule(inputs):
                 'Maintenance Fees': total_maintenance_fees_paid,
                 'Condo Fees': total_condo_fees_paid,
                 'Mortgage Insurance Paid': total_mortgage_insurance_paid,
+                'Property Insurance Paid': total_property_insurance_paid,
                 'Profit': profit_if_sold,
                 'Help': total_help,
                 'Profit with Help': profit_if_sold_with_help,
@@ -344,6 +354,7 @@ def calculate_amortization_schedule(inputs):
                 'Expenses Compared to Last Home': total_extra_monthly_expenses_paid,
                 'Maintenance Fees': total_maintenance_fees_paid,
                 'Mortgage Insurance Paid': total_mortgage_insurance_paid,
+                'Property Insurance Paid': total_property_insurance_paid,
                 'Profit': profit_if_sold,
                 'Help': total_help,
                 'Profit with Help': profit_if_sold_with_help,
@@ -365,7 +376,7 @@ def calculate_amortization_schedule(inputs):
 
         # Calculate if the property is cash flowing (for rental properties)
         if not is_cash_flowing and inputs.get("primary_residence") == "No" and inputs.get("rental_income_expected") == "Yes":
-            monthly_cash_flow = (rental_income_base * occupancy_rate) - monthly_payment - (annual_property_tax_base / 12) - inputs.get("monthly_maintenance") - condo_fee_base - property_management_fee_base - utilities_not_paid_by_occupant
+            monthly_cash_flow = (rental_income_base * occupancy_rate) - monthly_payment - (annual_property_tax_base / 12) - inputs.get("monthly_maintenance") - condo_fee_base - property_management_fee_base - utilities_not_paid_by_occupant - property_insurance_base
             if inputs.get("help") == "Yes":
                 monthly_cash_flow += inputs.get("monthly_help")
             if monthly_cash_flow > 0:

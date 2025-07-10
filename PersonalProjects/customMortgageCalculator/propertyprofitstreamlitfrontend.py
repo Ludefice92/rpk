@@ -414,6 +414,22 @@ def initialize_webpage(col2):
     )
     inputs["mortgage_insurance_cost"] = mortgage_insurance_cost
     
+    property_insurance = col2.number_input(
+        "What is your monthly property insurance cost?",
+        min_value=0.0,
+        max_value=5000.0,
+        value=300.0
+    )
+    inputs["property_insurance"] = property_insurance
+
+    property_insurance_annual_increase = col2.number_input(
+        "How much does your property insurance increase each year (in %)?",
+        min_value=0.0,
+        max_value=10.0,
+        value=2.0
+    )
+    inputs["property_insurance_annual_increase"] = property_insurance_annual_increase
+    
     is_taxed = st.radio("Will there be a tax on the sale of the property?", ("Yes", "No"), index=1)
     inputs["is_taxed"] = is_taxed
     if is_taxed == "Yes":
@@ -639,6 +655,14 @@ def are_inputs_valid(inputs):
 
     if inputs.get("mortgage_insurance_cost") is None or (inputs.get("mortgage_insurance_cost") < 0 or inputs.get("mortgage_insurance_cost") > 100000):
         print("Debug: Invalid mortgage insurance cost, must be between 0 and 100000")
+        return_val = False
+
+    if inputs.get("property_insurance") is None or (inputs.get("property_insurance") < 0 or inputs.get("property_insurance") > 5000):
+        print("Debug: Invalid property insurance cost")
+        return_val = False
+
+    if inputs.get("property_insurance_annual_increase") is None or (inputs.get("property_insurance_annual_increase") < 0 or inputs.get("property_insurance_annual_increase") > 10):
+        print("Debug: Invalid property insurance annual increase")
         return_val = False
 
     print("-----------------------------")
