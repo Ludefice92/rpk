@@ -266,6 +266,11 @@ def calculate_amortization_schedule(inputs):
         if inputs.get("help") == "Yes": total_help += inputs.get("monthly_help")
         # Add to monthly totals
         total_property_insurance_paid += property_insurance_base
+        if inputs.get("rental_income_expected") == "Yes":
+            monthly_cash_flow = (rental_income_base * occupancy_rate) - monthly_payment - (annual_property_tax_base / 12) - inputs.get("monthly_maintenance") - condo_fee_base - property_management_fee_base - utilities_not_paid_by_occupant - property_insurance_base
+            if inputs.get("help") == "Yes":
+                monthly_cash_flow += inputs.get("monthly_help")
+            monthly_cash_flow = round(monthly_cash_flow, 2)
         current_property_value *= appreciation_rate
         
         # Add renovation value increase to property value in the month renovations are completed
@@ -338,7 +343,8 @@ def calculate_amortization_schedule(inputs):
                 'Profit if Saving Rent': profit_if_sold_with_rent_saved,
                 'Profit with Rent Saved&Help': profit_if_sold_rentsaved_help,
                 'Profit with Rental Income': profit_if_sold_with_rental_income,
-                'Profit with Rental Income&Help': profit_if_sold_rentalincome_help
+                'Profit with Rental Income&Help': profit_if_sold_rentalincome_help,
+                'Total Interest Paid': total_interest_paid
             }
         else:
             row = {
@@ -363,8 +369,14 @@ def calculate_amortization_schedule(inputs):
                 'Profit if Saving Rent': profit_if_sold_with_rent_saved,
                 'Profit with Rent Saved&Help': profit_if_sold_rentsaved_help,
                 'Profit with Rental Income': profit_if_sold_with_rental_income,
-                'Profit with Rental Income&Help': profit_if_sold_rentalincome_help
+                'Profit with Rental Income&Help': profit_if_sold_rentalincome_help,
+                'Total Interest Paid': total_interest_paid
             }
+			
+        if inputs.get("rental_income_expected") == "Yes":
+            row['Monthly Cash Flow'] = monthly_cash_flow
+            row['Property Management Fees'] = round(total_property_management_fees, 2)
+            row['Utilities Not Paid by Renter'] = round(total_utilities_not_paid_by_renter, 2)
 
         # Round all numeric values in one step
         row = {
@@ -376,14 +388,11 @@ def calculate_amortization_schedule(inputs):
 
         # Calculate if the property is cash flowing (for rental properties)
         if not is_cash_flowing and inputs.get("primary_residence") == "No" and inputs.get("rental_income_expected") == "Yes":
-            monthly_cash_flow = (rental_income_base * occupancy_rate) - monthly_payment - (annual_property_tax_base / 12) - inputs.get("monthly_maintenance") - condo_fee_base - property_management_fee_base - utilities_not_paid_by_occupant - property_insurance_base
-            if inputs.get("help") == "Yes":
-                monthly_cash_flow += inputs.get("monthly_help")
             if monthly_cash_flow > 0:
                 is_cash_flowing = True
-                profitability_messages.append(f"The property is cash flowing with an initial monthly cash flow of ${monthly_cash_flow:.2f} in month {month}")
+                profitability_messages.append(f"The property starts cash flowing with ${monthly_cash_flow:.2f} in month {month}")
             elif month == inputs.get("amortization_period") * 12:
-                profitability_messages.append(f"The property is not cash flowing, with an initial monthly loss of ${-monthly_cash_flow:.2f}")
+                profitability_messages.append(f"The property is not cash flowing, with a monthly loss of ${-monthly_cash_flow:.2f}")
 
     return pd.DataFrame(schedule), profitability_messages
 

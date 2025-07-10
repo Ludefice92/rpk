@@ -671,7 +671,7 @@ def are_inputs_valid(inputs):
     if return_val: print("Debug: All inputs are valid")
     return return_val
 
-def create_visualization(amortization_schedule, variable_profit_columns):
+def create_visualization(amortization_schedule, variable_profit_columns, inputs):
     """
     Creates comprehensive matplotlib visualizations to display property profit calculation results.
     
@@ -681,39 +681,73 @@ def create_visualization(amortization_schedule, variable_profit_columns):
     
     Args:
         amortization_schedule (pandas.DataFrame): Results dataframe from profit calculations
+        variable_profit_columns (list): List of variable profit columns to display
+        inputs (dict): User inputs for conditional visualization logic
             
     Returns:
-        matplotlib.figure.Figure: Complete figure object with two subplots ready for display
+        matplotlib.figure.Figure: Complete figure object with three subplots ready for display
     """
-    fig, ((ax1, ax2)) = plt.subplots(2, 1, figsize=(18, 10))
+    is_rental = inputs.get('rental_income_expected') == 'Yes'
+    num_rows = 3 if is_rental else 2
+    fig, axs = plt.subplots(num_rows, 1, figsize=(18, 5 * num_rows))
 
-    # Plot 1: Lifetime Loss by CPP Start Age
-    ax1.plot(amortization_schedule['Month'], amortization_schedule['Profit'], linewidth=2)
-    ax1.set_title('Profit if there is no rental income, help, or savings from renting before', fontsize=14, fontweight='bold')
-    ax1.set_xlabel('Month property is sold')
-    ax1.set_ylabel('Profit ($)')
-    ax1.grid(True, alpha=0.3, axis='y')
-    
-    # Plot 2: Lifetime Benefits Breakdown
+    if num_rows == 2:
+        ax1, ax2 = axs
+        ax3 = None
+    else:
+        ax1, ax2, ax3 = axs
+
+    # ax1: Profit over time under various conditions (former ax2)
     if len(variable_profit_columns) > 0:
         if 'Profit if Saving Rent' in variable_profit_columns:
-            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit if Saving Rent'], marker='^', label='Rent Saved', linewidth=2)
+            ax1.plot(amortization_schedule['Month'], amortization_schedule['Profit if Saving Rent'], marker='^', label='Rent Saved', linewidth=2)
         if 'Profit with Help' in variable_profit_columns:
-            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Help'], marker='s', label='Help', linewidth=2)
+            ax1.plot(amortization_schedule['Month'], amortization_schedule['Profit with Help'], marker='s', label='Help', linewidth=2)
         if 'Profit with Rent Saved&Help' in variable_profit_columns:
-            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rent Saved&Help'], marker='x', label='Rent Saved+Help', linewidth=2)
+            ax1.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rent Saved&Help'], marker='x', label='Rent Saved+Help', linewidth=2)
         if 'Profit with Rental Income' in variable_profit_columns:
-            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rental Income'], marker='*', label='Rental Income', linewidth=2)
+            ax1.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rental Income'], marker='*', label='Rental Income', linewidth=2)
         if 'Profit with Rental Income&Help' in variable_profit_columns:
-            ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rent Saved&Help'], marker='D', label='Rental Income+Help', linewidth=2)
-    ax2.plot(amortization_schedule['Month'], amortization_schedule['Profit'], marker='o', label='Profit no modifiers', linewidth=2)
-    ax2.set_title('Profit over time under various conditions', fontsize=14, fontweight='bold')
-    ax2.set_xlabel('Month property is sold')
-    ax2.set_ylabel('Profit ($)')
+            ax1.plot(amortization_schedule['Month'], amortization_schedule['Profit with Rental Income&Help'], marker='D', label='Rental Income+Help', linewidth=2)
+    ax1.plot(amortization_schedule['Month'], amortization_schedule['Profit'], marker='o', label='Profit no modifiers', linewidth=2)
+    ax1.set_title('Profit over time under various conditions', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('Month property is sold')
+    ax1.set_ylabel('Profit ($)')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3, axis='y')
+    ax1.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+
+    # ax2: Cumulative Costs Analysis
+    ax2.plot(amortization_schedule['Month'], amortization_schedule['Property Tax'], label='Property Tax', linewidth=2)
+    ax2.plot(amortization_schedule['Month'], amortization_schedule['Maintenance Fees'], label='Maintenance Fees', linewidth=2)
+    ax2.plot(amortization_schedule['Month'], amortization_schedule['Property Insurance Paid'], label='Property Insurance', linewidth=2)
+    ax2.plot(amortization_schedule['Month'], amortization_schedule['Opportunity Cost'], label='Opportunity Cost', linewidth=2)
+    ax2.plot(amortization_schedule['Month'], amortization_schedule['Mortgage Insurance Paid'], label='Mortgage Insurance', linewidth=2)
+    ax2.plot(amortization_schedule['Month'], amortization_schedule['Expenses Compared to Last Home'], label='Extra Monthly Expenses', linewidth=2)
+    ax2.plot(amortization_schedule['Month'], amortization_schedule['Total Interest Paid'], label='Total Interest Paid', linewidth=2)
+    if 'Condo Fees' in amortization_schedule.columns:
+        ax2.plot(amortization_schedule['Month'], amortization_schedule['Condo Fees'], label='Condo Fees', linewidth=2)
+    if 'Property Management Fees' in amortization_schedule.columns:
+        ax2.plot(amortization_schedule['Month'], amortization_schedule['Property Management Fees'], label='Property Management', linewidth=2)
+    if 'Utilities Not Paid by Renter' in amortization_schedule.columns:
+        ax2.plot(amortization_schedule['Month'], amortization_schedule['Utilities Not Paid by Renter'], label='Utilities (Owner Paid)', linewidth=2)
+    ax2.set_title('Cumulative Costs Over Time', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('Month')
+    ax2.set_ylabel('Cumulative Amount ($)')
     ax2.legend()
-    ax2.grid(True, alpha=0.3, axis='y')
-    
+    ax2.grid(True, alpha=0.3)
     ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+
+    # ax3: Cash Flow Projection (only if rental)
+    if is_rental and ax3 is not None:
+        ax3.bar(amortization_schedule['Month'], amortization_schedule['Monthly Cash Flow'], color=['green' if x > 0 else 'red' for x in amortization_schedule['Monthly Cash Flow']], label='Monthly Cash Flow')
+        ax3.axhline(y=0, color='black', linestyle='--', label='Breakeven')
+        ax3.set_title('Monthly Cash Flow Projection', fontsize=14, fontweight='bold')
+        ax3.set_xlabel('Month')
+        ax3.set_ylabel('Cash Flow ($)')
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+        ax3.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
 
     plt.tight_layout()
     return fig
@@ -933,7 +967,7 @@ def main():
 
             # displaying graphs and table
             st.subheader("📈 Profit over Time")
-            fig = create_visualization(amortization_schedule, filtered_variable_profit_columns)
+            fig = create_visualization(amortization_schedule, filtered_variable_profit_columns, inputs)
             st.pyplot(fig)
 
             formatAndDisplayTable(amortization_schedule, filtered_variable_profit_columns)
