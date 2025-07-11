@@ -175,19 +175,6 @@ def initialize_webpage(col2):
         )
         inputs["renovation_cost"] = renovation_cost
         
-        renovation_delay = st.radio("Will renovations delay living in or renting the property?", ("Yes", "No"), index=1)
-        inputs["renovation_delay"] = renovation_delay
-        
-        if renovation_delay == "Yes":
-            renovation_months = col2.number_input(
-                "How many months will the renovations take?",
-                min_value=1,
-                max_value=60,
-                value=3,
-                help="Number of months the property will be unavailable due to renovations"
-            )
-            inputs["renovation_months"] = renovation_months
-        
         # Add renovation value increase field
         renovation_value_increase = col2.number_input(
             "Expected dollar amount increase (or decrease) in property value from renovations",
@@ -196,6 +183,20 @@ def initialize_webpage(col2):
             value=0.0
         )
         inputs["renovation_value_increase"] = renovation_value_increase
+
+    # Add move-in delay question after renovations section
+    move_in_delay = st.radio("Will there be a delay before you or a tenant can occupy the property?", ("Yes", "No"), index=1)
+    inputs["move_in_delay"] = move_in_delay
+
+    if move_in_delay == "Yes":
+        delay_months = col2.number_input(
+            "How many months will the delay be?",
+            min_value=1,
+            max_value=60,
+            value=3,
+            help="Number of months before the property can be occupied (due to renovations, repairs, permits, etc.)"
+        )
+        inputs["delay_months"] = delay_months
 
     down_payment_percentage = col2.number_input(
         "Down payment (as a % of property price)",
@@ -644,14 +645,15 @@ def are_inputs_valid(inputs):
             print("Debug: Missing renovation cost, or not between 1 and 5 times property price")
             return_val = False
         
-        if inputs.get("renovation_delay") == "Yes":
-            if inputs.get("renovation_months") is None or (inputs.get("renovation_months") < 1 or inputs.get("renovation_months") > 60):
-                print("Debug: Missing renovation months, or not between 1 and 60 months")
-                return_val = False
-        
         # Validate renovation value increase
         if inputs.get("renovation_value_increase") is None or (inputs.get("renovation_value_increase") < -500000 or inputs.get("renovation_value_increase") > 2000000):
             print("Debug: Invalid renovation value increase")
+            return_val = False
+
+    # Validate move-in delay inputs
+    if inputs.get("move_in_delay") == "Yes":
+        if inputs.get("delay_months") is None or (inputs.get("delay_months") < 1 or inputs.get("delay_months") > 60):
+            print("Debug: Missing delay months, or not between 1 and 60 months")
             return_val = False
 
     if inputs.get("mortgage_insurance_cost") is None or (inputs.get("mortgage_insurance_cost") < 0 or inputs.get("mortgage_insurance_cost") > 100000):

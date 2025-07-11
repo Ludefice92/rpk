@@ -229,20 +229,20 @@ def calculate_amortization_schedule(inputs):
             condo_fee_base *= condo_fee_annual_increase
             # Update property insurance annually
             property_insurance_base *= property_insurance_annual_increase
-        # Add renovation delay logic
-        is_renovation_period = False
-        if inputs.get("renovation_required") == "Yes" and inputs.get("renovation_delay") == "Yes":
-            renovation_months = inputs.get("renovation_months", 0)
-            if month <= renovation_months:
-                is_renovation_period = True
+        # Add move-in delay logic
+        is_delay_period = False
+        if inputs.get("move_in_delay") == "Yes":
+            delay_months = inputs.get("delay_months", 0)
+            if month <= delay_months:
+                is_delay_period = True
 
         if month != 1:
-            # Only add income if not in renovation period
-            if not is_renovation_period:
+            # Only add income if not in delay period
+            if not is_delay_period:
                 total_rent_saved += rent_base
                 total_rental_income += rental_income_base
                 total_property_management_fees += property_management_fee_base
-            # If in renovation period, do nothing (don't add to totals)
+            # If in delay period, do nothing (don't add to totals)
 
         # Check if we need to recalculate payment (only at term boundaries)
         if should_recalculate_payment(month, inputs.get("fixed_rate_mortgage", True), inputs.get("rate_periods", [])):
