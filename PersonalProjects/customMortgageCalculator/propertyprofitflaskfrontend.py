@@ -904,13 +904,183 @@ def main():
     with col2:
         col2.title("🏠 Property Profit Calculator")
         col2.markdown("### Calculate month by month profit for your property investment")
-        col2.markdown("""
-        This tool helps you analyze the profitability of your property purchase by considering:
-        - Mortgage payments and amortization
-        - Property appreciation
-        - Rental income (if applicable)
-        - Various expenses and scenarios
-        """)
+        
+        # HELP SECTION - Added here at the top center of the webpage
+        with st.expander("📋 How to Use This Calculator - Click to Expand", expanded=False):
+            st.markdown("""
+            ## What This Calculator Does
+            This tool analyzes the month-by-month profitability of your property purchase by calculating when you would break even if you sold the property at different points in time. It considers mortgage payments, property appreciation, various expenses, and multiple income scenarios.
+
+            ## How to Use the Calculator
+
+            ### 📝 **Step 1: Fill Out the Form**
+            Complete all the input fields below with your property and financial information. The form will guide you through different scenarios based on your selections (primary residence vs rental property, condo vs house, etc.).
+
+            ### 🔄 **Step 2: Calculate Results**
+            Once you've filled out all required fields, click the **"Calculate Profit if Sold on Monthly Basis"** button. This button will:
+            - Validate all your inputs to ensure they're within acceptable ranges
+            - Generate month-by-month calculations for the entire amortization period
+            - Create interactive charts showing profit scenarios over time
+            - Display a detailed table with monthly breakdowns
+            - Show profitability messages indicating when you'll break even under different scenarios
+
+            **Important**: If you change any inputs after calculating, you must click the **"Calculate Profit if Sold on Monthly Basis"** button again to generate new results with your updated information.
+
+            ### 📊 **Step 3: Review Your Results**
+            After calculation, you'll see:
+            - **Interactive Charts**: Visual representations of profit over time, cost breakdowns, and cash flow projections
+            - **Data Table**: Month-by-month breakdown showing loan balance, property value, and profit under various scenarios
+            - **Profitability Messages**: Text summaries telling you exactly when you'll be profitable under different conditions
+
+            ### 📥 **Step 4: Download Spreadsheet (Optional)**
+            After calculating results, a **"Download Spreadsheet"** button will appear. This button:
+            - Generates a comprehensive Excel file (.xlsx format) with all calculated data
+            - Includes the complete amortization schedule with monthly details
+            - Contains all profit scenarios and cost breakdowns in spreadsheet format
+            - Provides a permanent record you can save, share, or analyze further
+            - Automatically names the file "amortization_schedule.xlsx" for easy identification
+
+            ## Information You'll Need
+
+            ### 📊 **Essential Property Information**
+            - **Property Price**: The purchase price of the property
+            - **Down Payment**: Percentage you're putting down (typically 5-25%)
+            - **Interest Rate**: Your mortgage interest rate (or rate structure for variable mortgages)
+            - **Amortization Period**: Length of your mortgage (typically 25-30 years)
+
+            ### 🏘️ **Property Details**
+            - **Property Type**: Whether it's a condo (affects fees and maintenance)
+            - **Property Taxes**: Annual amount (check your municipality's website)
+            - **Property Insurance**: Monthly cost (get quotes from insurance providers)
+            - **Maintenance Budget**: Monthly amount for repairs and upkeep ($200-500 typical)
+
+            ### 💰 **Financial Scenarios**
+            Choose what applies to your situation:
+
+            **For Primary Residence:**
+            - Current rental situation (if moving from rented accommodation)
+            - Utility cost differences compared to current home
+            - Monthly assistance from family/partners/roommates
+
+            **For Rental Property:**
+            - Expected monthly rental income
+            - Occupancy rate (90-95% is typical)
+            - Property management fees (if hiring a manager)
+            - Utilities you'll pay vs. tenant responsibility
+
+            ### 📈 **Market Assumptions**
+            - **Property Appreciation Rate**: Historical average is 2-4% annually
+            - **Rental Income Increases**: Typical range is 2-3% annually
+            - **Property Tax Increases**: Usually 2-3% annually
+
+            ## Key Features Explained
+
+            ### 🎯 **Multiple Profit Scenarios**
+            The calculator shows profitability under different conditions:
+            - **Base Scenario**: Property investment alone
+            - **With Rental Income**: If you're renting out the property
+            - **With Help**: Including assistance from family/partners
+            - **Rent Savings**: If you're moving from a rental property
+            - **Combined Scenarios**: Multiple income sources together
+
+            ### 📊 **Opportunity Cost Analysis**
+            The calculator compares your property investment to putting your down payment in the S&P 500 (using 0.57% monthly historical returns). This shows the true cost of your investment decision.
+
+            ### 💸 **Comprehensive Cost Tracking**
+            Includes all major expenses:
+            - Mortgage payments (principal and interest)
+            - Property taxes and insurance
+            - Maintenance and repairs
+            - Condo fees (if applicable)
+            - Real estate fees when selling
+            - Legal fees and land transfer taxes
+            - Capital gains tax (if applicable)
+
+            ## How to Get Accurate Results
+
+            ### ✅ **Research These Numbers Carefully:**
+            1. **Property Taxes**: Check your city's property tax calculator
+            2. **Insurance Costs**: Get actual quotes from 2-3 providers
+            3. **Rental Rates**: Research comparable properties in your area
+            4. **Maintenance Costs**: Budget 1-3% of property value annually
+            5. **Condo Fees**: Get exact amounts from the condo corporation
+
+            ### ✅ **Be Conservative With Estimates:**
+            - Use slightly lower rental income estimates
+            - Budget higher for maintenance and repairs
+            - Consider vacancy periods for rental properties
+            - Account for potential interest rate increases
+
+            ### ✅ **Consider Market Conditions:**
+            - Property appreciation varies by location and market cycle
+            - Rental markets can be volatile
+            - Interest rates may change at renewal time
+
+            ## Understanding Your Results
+
+            ### 📈 **Profitability Timeline**
+            The calculator tells you exactly when you'll break even under different scenarios. Earlier profitability means better investment performance.
+
+            ### 💰 **Cash Flow Analysis** (For Rentals)
+            Shows monthly cash flow - whether the property pays for itself each month or requires additional funding.
+
+            ### 📊 **Visual Charts**
+            - **Profit Over Time**: Shows how profitability improves as you pay down the mortgage and property appreciates
+            - **Cost Breakdown**: Displays where your money goes each month
+            - **Cash Flow Projection**: Monthly income vs. expenses for rental properties
+
+            ### 📋 **Data Table**
+            The interactive table shows month-by-month details including:
+            - Loan balance and property value progression
+            - Profit calculations under different scenarios
+            - Only displays scenarios relevant to your specific inputs
+
+            ### 📥 **Excel Spreadsheet**
+            The downloadable spreadsheet contains:
+            - All data from the interactive table in Excel format
+            - Properly formatted columns with auto-sizing
+            - Sheet named with your property details for easy reference
+            - Complete amortization schedule for detailed analysis
+
+            ## Important Disclaimers
+
+            ⚠️ **This tool provides estimates only** - actual results may vary based on:
+            - Market conditions and economic changes
+            - Property-specific factors (location, condition, etc.)
+            - Changes in interest rates, taxes, or regulations
+            - Unexpected maintenance or repair costs
+            - Vacancy periods or rental market changes
+
+            ⚠️ **Always consult professionals** for personalized advice:
+            - Real estate agents for market analysis
+            - Mortgage brokers for financing options
+            - Accountants for tax implications
+            - Financial advisors for investment strategy
+
+            ## Tips for Success
+
+            ### 🎯 **Before You Buy:**
+            - Run multiple scenarios with different assumptions
+            - Stress-test with higher interest rates and lower rental income
+            - Ensure you have emergency funds for unexpected costs
+            - Consider your long-term plans and flexibility needs
+
+            ### 🎯 **Using the Results:**
+            - Compare different properties using the same assumptions
+            - Understand your break-even timeline before committing
+            - Plan for the worst-case scenarios shown in the analysis
+            - Use results to negotiate better purchase terms or financing
+            - Save the Excel spreadsheet for future reference and comparison
+
+            ### 🎯 **Updating Your Analysis:**
+            - Remember to click **"Calculate Profit if Sold on Monthly Basis"** again after changing any inputs
+            - Test different scenarios by adjusting key variables
+            - Download new spreadsheets when you make significant changes
+            - Keep records of different property analyses for comparison
+
+            ---
+            *Remember: Real estate investment involves risks. This calculator helps you understand potential outcomes, but market conditions can change. Always do thorough research and consider professional advice before making investment decisions.*
+            """)
 
         inputs = initialize_webpage(col2)
                                                                              
@@ -987,53 +1157,6 @@ def main():
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
     
-        # Information section
-        col2.markdown("---")
-        col2.subheader("ℹ️ About This Tool")
- 
-        with col2.expander("How Property Investment Analysis Works"):
-            col2.markdown("""
-            **Mortgage Calculations:**
-            - Uses standard amortization formula to calculate monthly payments
-            - Tracks principal vs interest payments over time
-            - Accounts for different down payment percentages and interest rates
-            
-            **Opportunity Cost Analysis:**
-            - Compares property investment to S&P 500 historical returns (0.57% monthly)
-            - Shows what your down payment could have earned in the stock market
-            - Helps evaluate true investment performance
-            
-            **Multiple Scenarios:**
-            - Primary residence vs rental property analysis
-            - Accounts for rental income, property management, and vacancy rates
-            - Includes assistance from family/partners and rent savings
-            """)
-        
-        with col2.expander("Key Financial Assumptions"):
-            col2.markdown("""
-            **Property Appreciation:**
-            - Annual appreciation rate is converted to monthly compounding
-            - Property taxes and condo fees increase annually at specified rates
-            - Rental income can increase annually to keep pace with market
-            
-            **Cost Considerations:**
-            - Includes land transfer tax, real estate agent fees, and capital gains tax
-            - Monthly maintenance budget and utility costs
-            - Property management fees for rental properties
-            - Opportunity cost of down payment investment
-            """)
-        
-        with col2.expander("Important Disclaimers"):
-            col2.markdown("""
-            **⚠️ Important Notes:**
-            - This tool provides estimates based on simplified calculations
-            - Actual property values and rental markets can be volatile
-            - Interest rates, taxes, and regulations may change over time
-            - Consider consulting with a financial advisor for personalized advice
-            - Property investment involves risks including market downturns and vacancy
-            - Results are for educational purposes and should not be considered financial advice
-            """)
-
         # PayPal donation button at the bottom of the page
         col2.markdown("---")  # Add a separator line
         col2.markdown("### Support This Tool")
