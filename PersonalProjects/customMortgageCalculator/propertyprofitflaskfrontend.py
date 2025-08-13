@@ -55,10 +55,10 @@ def initialize_webpage(col2):
             inputs["rental_income_annual_increase"] = rental_income_annual_increase
 
             occupancy_rate = col2.number_input(
-                "What is the occupancy rate of your new rental (in %, 95 is the max allowed)?",
-                min_value=50.0,
-                max_value=95.0,
-                value=90.0,
+                "What is the occupancy rate of your new rental (in %)?",
+                min_value=10.0,
+                max_value=100.0,
+                value=95.0,
                 help="Expected occupancy rate of the rental unit"
             )
             inputs["occupancy_rate"] = occupancy_rate
@@ -75,16 +75,16 @@ def initialize_webpage(col2):
                 )
                 inputs["property_management_fees"] = property_management_fees
 
-            are_utilities_paid_by_renter = st.radio("Are there utilities that your renter is not paying for?",("Yes", "No"))
-            inputs["are_utilities_paid_by_renter"] = are_utilities_paid_by_renter
-            if are_utilities_paid_by_renter == "Yes":
-                total_utilities_not_paid_by_occupant = col2.number_input(
+            are_utilities_not_paid_by_renter = st.radio("Are there utilities that your renter/occupant is not paying for?",("Yes", "No"))
+            inputs["are_utilities_not_paid_by_renter"] = are_utilities_not_paid_by_renter
+            if are_utilities_not_paid_by_renter == "Yes":
+                monthly_utilities_not_paid_by_occupant = col2.number_input(
                     "How much are you paying in utilities per month that your renter is not responsible for?",
-                    min_value=50.0,
-                    max_value=2500.0,
+                    min_value=10.0,
+                    max_value=5000.0,
                     value=100.0
                 )
-                inputs["total_utilities_not_paid_by_occupant"] = total_utilities_not_paid_by_occupant
+                inputs["monthly_utilities_not_paid_by_occupant"] = monthly_utilities_not_paid_by_occupant
 
     else:
         moving_from_rent = st.radio("Are you moving from a property which you currently rent?", ("Yes", "No"), index=1)
@@ -145,7 +145,7 @@ def initialize_webpage(col2):
         inputs["monthly_help"] = monthly_help
 
     property_price = col2.number_input(
-        "Property price",
+        "Property price (include any sales taxes in the price if they exist)",
         min_value=50000.0,
         max_value=50000000.0,
         value=500000.0
@@ -154,7 +154,7 @@ def initialize_webpage(col2):
 
     # New input for additional financed costs
     additional_financed_costs = col2.number_input(
-        "Additional costs to be financed by including it in the mortgage loan",
+        "Additional costs to be financed by including them in the mortgage loan",
         min_value=0.0,
         max_value=property_price * 2.0,  # Reasonable maximum relative to property price
         value=0.0,
@@ -185,12 +185,12 @@ def initialize_webpage(col2):
         inputs["renovation_value_increase"] = renovation_value_increase
 
     # Add move-in delay question after renovations section
-    move_in_delay = st.radio("Will there be a delay before you or a tenant can occupy the property?", ("Yes", "No"), index=1)
+    move_in_delay = st.radio("Will there be a delay before you or a tenant can occupy the property after closing the purchase?", ("Yes", "No"), index=1)
     inputs["move_in_delay"] = move_in_delay
 
     if move_in_delay == "Yes":
         delay_months = col2.number_input(
-            "How many months will the delay be?",
+            "How many months will the delay be? Note: this delay is not included in the occupancy rate calculation for rental properties",
             min_value=1,
             max_value=60,
             value=3,
@@ -200,8 +200,8 @@ def initialize_webpage(col2):
 
     down_payment_percentage = col2.number_input(
         "Down payment (as a % of property price)",
-        min_value=5.0,
-        max_value=75.0,
+        min_value=0.0,
+        max_value=95.0,
         value=20.0
     )
     inputs["down_payment_percentage"] = down_payment_percentage
@@ -224,12 +224,12 @@ def initialize_webpage(col2):
 
     fixed_or_variable = st.radio(
         "Select Mortgage Type:",
-        ["Fixed Rate", "Variable Rate"],
+        ["Fixed Rate for Entire Amortization Period", "Fixed Rate where Mortgage Terms < Amortization Period"],
         index=0,
         horizontal=True
     )
 
-    fixed_rate_mortgage = fixed_or_variable == "Fixed Rate"
+    fixed_rate_mortgage = fixed_or_variable == "Fixed Rate for Entire Amortization Period"
     inputs["fixed_rate_mortgage"] = fixed_rate_mortgage
 
     if fixed_rate_mortgage: #checks if rate is fixed
@@ -243,7 +243,7 @@ def initialize_webpage(col2):
         #pass  # Interest rate input is already defined above
     else:
         # Variable rate mortgage options
-        st.write("**Variable Rate Mortgage Configuration**")
+        st.write("**Mortgage Configuration**")
         
         rate_structure_preset = st.selectbox(
             "Choose a common structure or create custom:",
@@ -420,7 +420,7 @@ def initialize_webpage(col2):
         "What is your monthly property insurance cost?",
         min_value=0.0,
         max_value=5000.0,
-        value=300.0
+        value=100.0
     )
     inputs["property_insurance"] = property_insurance
 
@@ -476,7 +476,7 @@ def are_inputs_valid(inputs):
     Validation Rules:
         - Interest rate: 0-20%
         - Property price: $50,000-$50,000,000
-        - Down payment: 5-75% of property price
+        - Down payment: 0-95% of property price
         - Appreciation rate: 0-10% annually
         - Amortization period: 1-30 years
         - Property taxes: $0-$50,000 annually
@@ -543,8 +543,8 @@ def are_inputs_valid(inputs):
         print("Debug: Missing additional financed costs, or it's negative or more than 200% of property price")
         return_val = False
 
-    if inputs.get("down_payment_percentage") is None or (inputs.get("down_payment_percentage") < 5 or inputs.get("down_payment_percentage") > 75):
-        print("Debug: Missing down payment %, or not above between 5 and 75%")
+    if inputs.get("down_payment_percentage") is None or (inputs.get("down_payment_percentage") < 0 or inputs.get("down_payment_percentage") > 95):
+        print("Debug: Missing down payment %, or not between 0 and 95%")
         return_val = False
 
     if inputs.get("appreciation_rate") is None or (inputs.get("appreciation_rate") <= 0 or inputs.get("appreciation_rate") > 10):
@@ -588,8 +588,8 @@ def are_inputs_valid(inputs):
         if inputs.get("rental_income_amount") is None or (inputs.get("rental_income_amount")<=500 or inputs.get("rental_income_amount")>=50000):
             print("Debug: Missing rental income amount, or not between 500 and 500000")
             return_val = False
-        if inputs.get("occupancy_rate") is None or (inputs.get("occupancy_rate")<50 or inputs.get("occupancy_rate")>95):
-            print("Debug: Missing rental income property occupancy rate, or not between 50 and 95%")
+        if inputs.get("occupancy_rate") is None or (inputs.get("occupancy_rate")<10 or inputs.get("occupancy_rate")>100):
+            print("Debug: Missing rental income property occupancy rate, or not between 10 and 100%")
             return_val = False
         if inputs.get("rental_income_annual_increase") is None or (inputs.get("rental_income_annual_increase")<=0 or inputs.get("rental_income_annual_increase")>20):
             print("Debug: Missing rental income annual increase, or it's below/equal to 0 or >20%")
@@ -906,21 +906,21 @@ def main():
         col2.markdown("### Calculate month by month profit for your property investment")
         
         # HELP SECTION - Added here at the top center of the webpage
-        with st.expander("📋 How to Use This Calculator - Click to Expand", expanded=False):
+        with st.expander("📋 How to Use This Calculator - Click to Expand/Minimize", expanded=False):
             st.markdown("""
             ## What This Calculator Does
-            This tool analyzes the month-by-month profitability of your property purchase by calculating when you would break even if you sold the property at different points in time. It considers mortgage payments, property appreciation, various expenses, and multiple income scenarios.
+            This tool analyzes the month-by-month profitability of your property purchase by calculating how much you would make or lose if you sold the property at different points in time. It considers mortgage payments, property appreciation, various expenses, and multiple income scenarios.
 
             ## How to Use the Calculator
 
             ### 📝 **Step 1: Fill Out the Form**
-            Complete all the input fields below with your property and financial information. The form will guide you through different scenarios based on your selections (primary residence vs rental property, condo vs house, etc.).
+            Complete all the input fields below with your property and financial information. The form will guide you through different scenarios based on your selections (primary residence vs rental property, condo vs freehold, etc.).
 
             ### 🔄 **Step 2: Calculate Results**
             Once you've filled out all required fields, click the **"Calculate Profit if Sold on Monthly Basis"** button. This button will:
-            - Validate all your inputs to ensure they're within acceptable ranges
+            - Validate all your inputs to ensure they're within reasonable ranges
             - Generate month-by-month calculations for the entire amortization period
-            - Create interactive charts showing profit scenarios over time
+            - Create graphs showing profit scenarios and costs over time
             - Display a detailed table with monthly breakdowns
             - Show profitability messages indicating when you'll break even under different scenarios
 
@@ -928,31 +928,30 @@ def main():
 
             ### 📊 **Step 3: Review Your Results**
             After calculation, you'll see:
-            - **Interactive Charts**: Visual representations of profit over time, cost breakdowns, and cash flow projections
+            - **Informative Graphs**: Visual representations of profit and cost breakdowns over time
             - **Data Table**: Month-by-month breakdown showing loan balance, property value, and profit under various scenarios
-            - **Profitability Messages**: Text summaries telling you exactly when you'll be profitable under different conditions
+            - **Profitability Messages**: Text summaries telling you exactly when you'll be profitable under different conditions and when cash flow becomes positive for a rental
 
             ### 📥 **Step 4: Download Spreadsheet (Optional)**
-            After calculating results, a **"Download Spreadsheet"** button will appear. This button:
+            After calculating results, a **"Download Spreadsheet"** button will appear below your results. This button:
             - Generates a comprehensive Excel file (.xlsx format) with all calculated data
             - Includes the complete amortization schedule with monthly details
-            - Contains all profit scenarios and cost breakdowns in spreadsheet format
-            - Provides a permanent record you can save, share, or analyze further
+            - Contains all profit scenarios and cost breakdowns
             - Automatically names the file "amortization_schedule.xlsx" for easy identification
 
             ## Information You'll Need
 
             ### 📊 **Essential Property Information**
             - **Property Price**: The purchase price of the property
-            - **Down Payment**: Percentage you're putting down (typically 5-25%)
-            - **Interest Rate**: Your mortgage interest rate (or rate structure for variable mortgages)
+            - **Down Payment**: Percentage you're putting down
             - **Amortization Period**: Length of your mortgage (typically 25-30 years)
+            - **Interest Rate**: Your mortgage interest rate (can do one for the entire amortization period, or split it into fixed rate for loan terms smaller than the amortization period)
 
             ### 🏘️ **Property Details**
-            - **Property Type**: Whether it's a condo (affects fees and maintenance)
-            - **Property Taxes**: Annual amount (check your municipality's website)
-            - **Property Insurance**: Monthly cost (get quotes from insurance providers)
-            - **Maintenance Budget**: Monthly amount for repairs and upkeep ($200-500 typical)
+            - **Property Type**: Whether it's a condo or freehold (affects fees and maintenance)
+            - **Property Taxes**: Annual amount
+            - **Property Insurance**: Monthly cost
+            - **Maintenance Budget**: Monthly amount for repairs and upkeep ($200-500 is typical)
 
             ### 💰 **Financial Scenarios**
             Choose what applies to your situation:
@@ -964,70 +963,46 @@ def main():
 
             **For Rental Property:**
             - Expected monthly rental income
-            - Occupancy rate (90-95% is typical)
+            - Occupancy rate (95% is the maximum as you should never model 100% occupancy)
             - Property management fees (if hiring a manager)
             - Utilities you'll pay vs. tenant responsibility
+                        
+            ## Tips for Success
 
-            ### 📈 **Market Assumptions**
-            - **Property Appreciation Rate**: Historical average is 2-4% annually
-            - **Rental Income Increases**: Typical range is 2-3% annually
-            - **Property Tax Increases**: Usually 2-3% annually
+            ### 🎯 **Before You Buy:**
+            - Run multiple scenarios with different assumptions
+            - Stress-test with higher interest rates and lower rental income
+            - Ensure you have emergency funds for unexpected costs
+            - Consider your long-term plans and flexibility needs
 
-            ## Key Features Explained
+            ### 🎯 **Using the Results:**
+            - Compare different properties using the same assumptions
+            - Understand your break-even timeline before committing
+            - Plan for the worst-case scenarios shown in the analysis
+            - Save the Excel spreadsheet for future reference and comparison
 
-            ### 🎯 **Multiple Profit Scenarios**
-            The calculator shows profitability under different conditions:
-            - **Base Scenario**: Property investment alone
-            - **With Rental Income**: If you're renting out the property
-            - **With Help**: Including assistance from family/partners
-            - **Rent Savings**: If you're moving from a rental property
-            - **Combined Scenarios**: Multiple income sources together
-
-            ### 📊 **Opportunity Cost Analysis**
-            The calculator compares your property investment to putting your down payment in the S&P 500 (using 0.57% monthly historical returns). This shows the true cost of your investment decision.
-
-            ### 💸 **Comprehensive Cost Tracking**
-            Includes all major expenses:
-            - Mortgage payments (principal and interest)
-            - Property taxes and insurance
-            - Maintenance and repairs
-            - Condo fees (if applicable)
-            - Real estate fees when selling
-            - Legal fees and land transfer taxes
-            - Capital gains tax (if applicable)
-
-            ## How to Get Accurate Results
-
-            ### ✅ **Research These Numbers Carefully:**
-            1. **Property Taxes**: Check your city's property tax calculator
-            2. **Insurance Costs**: Get actual quotes from 2-3 providers
-            3. **Rental Rates**: Research comparable properties in your area
-            4. **Maintenance Costs**: Budget 1-3% of property value annually
-            5. **Condo Fees**: Get exact amounts from the condo corporation
-
-            ### ✅ **Be Conservative With Estimates:**
-            - Use slightly lower rental income estimates
-            - Budget higher for maintenance and repairs
-            - Consider vacancy periods for rental properties
-            - Account for potential interest rate increases
-
-            ### ✅ **Consider Market Conditions:**
-            - Property appreciation varies by location and market cycle
-            - Rental markets can be volatile
-            - Interest rates may change at renewal time
+            ### 🎯 **Updating Your Analysis:**
+            - Remember to click **"Calculate Profit if Sold on Monthly Basis"** again after changing any inputs
+            - Test different scenarios by adjusting key variables
+            - Download new spreadsheets when you make changes
+            - Keep records of different property analyses for comparison
 
             ## Understanding Your Results
+                        
+            ### 📊 **Opportunity Cost Analysis**
+            The calculator includes the cost of not putting your down payment in the S&P 500 (using 0.57% monthly historical returns). This shows the true cost of your investment decision.
 
             ### 📈 **Profitability Timeline**
             The calculator tells you exactly when you'll break even under different scenarios. Earlier profitability means better investment performance.
-
-            ### 💰 **Cash Flow Analysis** (For Rentals)
-            Shows monthly cash flow - whether the property pays for itself each month or requires additional funding.
 
             ### 📊 **Visual Charts**
             - **Profit Over Time**: Shows how profitability improves as you pay down the mortgage and property appreciates
             - **Cost Breakdown**: Displays where your money goes each month
             - **Cash Flow Projection**: Monthly income vs. expenses for rental properties
+                        
+            ### 💰 **Cash Flow Analysis** (For Rental properties only)
+            Shows monthly cash flow i.e. whether the property pays for itself each month. If this number is negative, you will be losing that much money per month as you build equity.
+            Ideally you want to be cash flow positive for a rental investment with a fair amount of breathing room.
 
             ### 📋 **Data Table**
             The interactive table shows month-by-month details including:
@@ -1037,10 +1012,10 @@ def main():
 
             ### 📥 **Excel Spreadsheet**
             The downloadable spreadsheet contains:
-            - All data from the interactive table in Excel format
+            - All data from the interactive table in .xlsx format
             - Properly formatted columns with auto-sizing
-            - Sheet named with your property details for easy reference
-            - Complete amortization schedule for detailed analysis
+            - Sheet named with your property details for easy reference (formatted as $propertyValue_interestRate%_amortizationPeriod)
+            - Complete month by month amortization schedule for detailed analysis
 
             ## Important Disclaimers
 
@@ -1056,28 +1031,6 @@ def main():
             - Mortgage brokers for financing options
             - Accountants for tax implications
             - Financial advisors for investment strategy
-
-            ## Tips for Success
-
-            ### 🎯 **Before You Buy:**
-            - Run multiple scenarios with different assumptions
-            - Stress-test with higher interest rates and lower rental income
-            - Ensure you have emergency funds for unexpected costs
-            - Consider your long-term plans and flexibility needs
-
-            ### 🎯 **Using the Results:**
-            - Compare different properties using the same assumptions
-            - Understand your break-even timeline before committing
-            - Plan for the worst-case scenarios shown in the analysis
-            - Use results to negotiate better purchase terms or financing
-            - Save the Excel spreadsheet for future reference and comparison
-
-            ### 🎯 **Updating Your Analysis:**
-            - Remember to click **"Calculate Profit if Sold on Monthly Basis"** again after changing any inputs
-            - Test different scenarios by adjusting key variables
-            - Download new spreadsheets when you make significant changes
-            - Keep records of different property analyses for comparison
-
             ---
             *Remember: Real estate investment involves risks. This calculator helps you understand potential outcomes, but market conditions can change. Always do thorough research and consider professional advice before making investment decisions.*
             """)

@@ -170,10 +170,12 @@ def calculate_amortization_schedule(inputs):
         rental_income_increase_rate = 1 + inputs.get("rental_income_annual_increase") * 0.01
         rental_income_base = inputs.get("rental_income")
         occupancy_rate = inputs.get("occupancy_rate") * 0.01
-        if inputs.get("are_utilities_paid_by_renter") == "Yes":
-            utilities_not_paid_by_occupant = 0
+        if inputs.get("move_in_delay") == "Yes":
+            occupancy_rate *= (((inputs.get("amortization_period") * 12) - inputs.get("delay_months")) / (inputs.get("amortization_period") * 12))
+        if inputs.get("are_utilities_not_paid_by_renter") == "Yes":
+            utilities_not_paid_by_occupant = inputs.get("monthly_utilities_not_paid_by_occupant")
         else:
-            utilities_not_paid_by_occupant = inputs.get("total_utilities_not_paid_by_occupant")
+            utilities_not_paid_by_occupant = 0
     else:
         rental_income_increase_rate = 1
         rental_income_base = 0
@@ -267,9 +269,9 @@ def calculate_amortization_schedule(inputs):
         # Add to monthly totals
         total_property_insurance_paid += property_insurance_base
         if inputs.get("rental_income_expected") == "Yes":
-            monthly_cash_flow = (rental_income_base * occupancy_rate) - monthly_payment - (annual_property_tax_base / 12) - inputs.get("monthly_maintenance") - condo_fee_base - property_management_fee_base - utilities_not_paid_by_occupant - property_insurance_base
-            if inputs.get("help") == "Yes":
-                monthly_cash_flow += inputs.get("monthly_help")
+            monthly_cash_flow = (rental_income_base * occupancy_rate) - monthly_payment - (annual_property_tax_base / 12) - inputs.get("monthly_maintenance") - condo_fee_base - property_management_fee_base - utilities_not_paid_by_occupant - property_insurance_base - inputs.get("mortgage_insurance_cost", 0)
+#            if inputs.get("help") == "Yes": #maybe include an option for this...probably not
+#                monthly_cash_flow += inputs.get("monthly_help")
             monthly_cash_flow = round(monthly_cash_flow, 2)
         current_property_value *= appreciation_rate
         
@@ -297,7 +299,7 @@ def calculate_amortization_schedule(inputs):
         profit_if_sold_rentsaved_help = profit_if_sold + total_rent_saved + total_help
         profit_if_sold_with_rental_income = profit_if_sold + (total_rental_income * occupancy_rate) - total_property_management_fees
         profit_if_sold_rentalincome_help = profit_if_sold_with_rental_income + total_help
-        if outstanding_balance<0: outstanding_balance = 0 #due to rounding it can be negative at the end
+        if outstanding_balance<50: outstanding_balance = 0 #due to rounding it can be negative or slightly above 0 at the end
 
         #outputting month of profitability for each combination selling
         if not is_profitable and profit_if_sold > 0:
